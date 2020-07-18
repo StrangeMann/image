@@ -5,6 +5,10 @@
 #include <iostream>
 #include <vector>
 
+#include <opencv2/core.hpp>
+//#include <opencv2/highgui.hpp>
+//#include <opencv2/imgcodecs.hpp>
+
 namespace edma_measure {
 struct CSVRow {
   CSVRow() = default;
@@ -15,29 +19,40 @@ struct CSVRow {
 
 class EdmaData {
  public:
-  EdmaData(std::ifstream& file);
+  EdmaData(std::ifstream& points_symmetry);
 
-  bool Fill(const std::vector<std::string>& row);
+  bool Fill(const std::vector<std::string>& row, std::string img_folder);
   std::vector<double> Metrics();
   std::string Name();
+  void DisplayImage();
+  void DrawCenter(std::vector<double>& line);
+
  private:
   void CountRanges();
-  double Range(std::pair<double, double> p1,
-               std::pair<double, double> p2) const;
+  static double Range(cv::Point2d p1, cv::Point2d p2);
+  void MakeVectorUnit(std::vector<double>& line);
 
   void SetDiffToRatio();
   void SetDiffToSubstr();
 
+  // Metrics depend on what is contained in range_diff_
   double MinMaxMetric();
-  double AvgMetric(int sampling_frame,int repeats,double alpha);
+  double AvgMetric(int sampling_frame, int repeats, double alpha);
 
-  std::string name;
-  std::vector<std::pair<double, double>> coordinates_;
-  std::vector<int> right_points;
-  std::vector<int> left_points;
-  std::vector<std::vector<double>> r_ranges;
-  std::vector<std::vector<double>> l_ranges;
-  std::vector<double> range_diff;
+  double CenterMetric();
+
+  std::vector<double> CenterLine();  // output: vx, vy, x0, y0
+
+  std::string name_;
+  std::vector<cv::Point2d> coordinates_;
+  std::vector<int> right_points_;
+  std::vector<int> left_points_;
+  std::vector<int> central_points_;
+  std::vector<std::vector<double>> r_ranges_;
+  std::vector<std::vector<double>> l_ranges_;
+  std::vector<double> range_diff_;
+
+  cv::Mat img_;
 };
 
 }  // namespace edma_measure
