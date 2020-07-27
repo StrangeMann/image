@@ -8,4 +8,4 @@ project(image)
 #include(cmake/build_prefix.cmake)
 
 add_subdirectory(io)
-add_subdirectory(edma_measure)
+add_subdirectory(face_assessment)
