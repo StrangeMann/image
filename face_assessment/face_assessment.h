@@ -64,6 +64,11 @@ namespace face_assessment {
 //
 //  cv::CascadeClassifier face_detector_;
 //};
+struct DataRow {
+  std::string name;
+  std::vector<double> features;
+  bool is_right;
+};
 
 template <typename _Tp>
 void OLBP_(const cv::Mat& src, cv::Mat& dst);
@@ -79,8 +84,9 @@ void FindEyes(cv::Mat& src, std::vector<cv::Rect>& eyes,
 void SelectTwoEyes(std::vector<cv::Rect>& eyes);
 bool Allign(cv::Mat& img, const std::vector<double>& central_line);
 void RetrieveFeatures(cv::Mat& img, std::vector<double>& features);
-void RecordFeatures(const std::vector<double>& features,
-                    std::ofstream& csv_file, std::string img_name);
+void RecordFeature(const DataRow& row, cv::FileStorage& output);
+bool ObtainData(std::string path, std::string right_images_txt);
+
 }  // namespace face_assessment
 
 #endif

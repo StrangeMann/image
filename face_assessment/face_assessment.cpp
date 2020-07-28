@@ -408,7 +408,8 @@ std::vector<double> CenterLine(cv::Point2d a, cv::Point2d b) {
 }
 bool Allign(cv::Mat& img, const std::vector<double>& central_line) {
   double alpha = atan2(central_line[0], central_line[1]) * 180 / PI;
-  if (alpha > 30) {
+  std::cout << alpha << '\n';
+  if (abs(alpha) > 20) {
     return false;
   }
   cv::Point center(img.cols / 2, img.rows / 2);
@@ -432,9 +433,9 @@ void RetrieveFeatures(cv::Mat& img, std::vector<double>& features) {
       rectangle(mask_l, l_p1, l_p2, cv::Scalar(255), cv::LineTypes::FILLED);
       rectangle(mask_r, r_p1, r_p2, cv::Scalar(255), cv::LineTypes::FILLED);
 
-      //imshow("mask_l", mask_l);
-      //imshow("mask_r", mask_r);
-      //cv::waitKey();
+      // imshow("mask_l", mask_l);
+      // imshow("mask_r", mask_r);
+      // cv::waitKey();
 
       cv::Mat hist_l, hist_r;
       std::vector<cv::Mat> img_wrapper{img};
@@ -453,25 +454,29 @@ void RetrieveFeatures(cv::Mat& img, std::vector<double>& features) {
     }
   }
 }
-void RecordFeatures(const std::vector<double>& features,
-                    std::ofstream& csv_file, std::string img_name) {
-  csv_file << img_name << ';';
-  for (int i = 0; i < features.size(); ++i) {
-    csv_file << features[i] << ';';
-  }
-  csv_file << '\n';
+void RecordFeature(const DataRow& row, cv::FileStorage& output) {
+  output << "{:"
+         << "name" << row.name << "features" << row.features << "is_right"
+         << row.is_right << "}";
 }
-}  // namespace face_assessment
+bool ObtainData(std::string path, std::string right_images_txt) {
+  using namespace face_assessment;
+  using namespace std;
+  using namespace cv;
+  std::ifstream input(right_images_txt);
+  if (!input.is_open()) {
+    return false;
+  }
+  std::vector<std::string> right_images;
+  std::string inp_name;
+  while (input >> inp_name) {
+    right_images.push_back(inp_name);
+  }
+  int im = 0;
 
-using namespace face_assessment;
-using namespace std;
-using namespace cv;
-int main() {
-  ofstream data("../../resources/data.csv");
-  // for (int i = 0; i < 20; ++i) {
-  //  data << i << ';' << i * i << '\n';
-  //}
-  // data.close();
+  cv::FileStorage output(path, cv::FileStorage::WRITE);
+  output << "features"
+         << "[";
 
   std::string image_path("../../resources/jpg/");
   CascadeClassifier face_detector;
@@ -483,7 +488,15 @@ int main() {
 
   for (const auto& entry : std::filesystem::directory_iterator(image_path)) {
     Mat image = imread(entry.path().string(), IMREAD_GRAYSCALE);
-    imshow("image", image);
+    DataRow row;
+    row.is_right = false;
+    std::string right_name = right_images[im] + ".jpg";
+    row.name = entry.path().filename().string();
+    if (im < right_images.size() && right_name == row.name) {
+      row.is_right = true;
+      ++im;
+    }
+    // imshow("image", image);
 
     vector<Rect> eyes_r, eyes_l;
     FindEyes(image, eyes_r, eye_detector_r);
@@ -494,67 +507,39 @@ int main() {
     SelectTwoEyes(eyes);
     if (eyes.size() == 2) {
       std::vector<double> central_line(SplitFace(image, eyes));
-      // if (!central_line.empty()) {
-      //  int t(100);
-      //  cv::line(image, cv::Point2d(central_line[2], central_line[3]),
-      //           cv::Point2d(central_line[2] + central_line[0] * t,
-      //                       central_line[3] + central_line[1] * t),
-      //           cv::Scalar(255));
-      //}
+      if (!central_line.empty()) {
+        int t(100);
+        cv::line(image, cv::Point2d(central_line[2], central_line[3]),
+                 cv::Point2d(central_line[2] + central_line[0] * t,
+                             central_line[3] + central_line[1] * t),
+                 cv::Scalar(255));
+      }
       if (!Allign(image, central_line)) {
         continue;
       }
       // imshow("image_center", image);
       Mat cut_img;
-      CutFace(image, cut_img, face_detector, central_line);
+      if (!CutFace(image, cut_img, face_detector, central_line)) {
+        continue;
+      }
       // imshow("cut_img", image);
       Mat LBP_img;
       OLBP_<char>(cut_img, LBP_img);
+
       imshow("OLBP image", LBP_img);
-      std::vector<double> features;
-      RetrieveFeatures(LBP_img, features);
-      RecordFeatures(features, data, entry.path().filename().string());
-      // waitKey();
+      RetrieveFeatures(LBP_img, row.features);
+      RecordFeature(row, output);
     }
   }
-  // double eps(0.02);
+  output << "]";
+  output.release();
+}
+}  // namespace face_assessment
 
-  // std::vector<std::string> names_of_best;
-  // std::ifstream best("../../resources/best_img.txt");
-  // std::string best_name;
-  // while (best >> best_name) {
-  //  names_of_best.push_back(best_name);
-  //}
-
-  // std::ifstream landmarks("../../resources/muct76-opencv.csv");
-  // std::ifstream points("../../resources/points.txt");
-  // std::string image_path("../../resources/jpg/");
-  // std::string
-  // classifier("../../resources/haarcascade_frontalface_default.xml"); CSVRow
-  // row; ImageProcessor data(points, classifier); double min(10000);
-  // std::string min_name; double max(-10000); std::string max_name; int
-  // count(0);
-  //// while (row.readNextRow(landmarks)) {
-  ////  if (data.Fill(row.row_, image_path)) {
-  ////    data.Rotation();
-  ////    // std::vector<double> metrics = data.Metrics();
-  ////    // if (metrics[4] < eps) {
-  ////    //  string name = data.Name();
-  ////    //  for (auto x : metrics) {
-  ////    //    cout << x << ' ';
-  ////    //  }
-  ////    //  cout << "name: " << name << ' ';
-  ////    //  if (std::find(names_of_best.begin(), names_of_best.end(), name) !=
-  ////    //      names_of_best.end()) {
-  ////    //    cout << "********";
-  ////    //    ++count;
-  ////    //  }
-  ////    //  cout << '\n';
-  ////    //  data.OutlineFace();
-  ////    //  data.DisplayImage();
-  ////    //}
-  ////  }
-  ////}
-  // cout << count;
+using namespace face_assessment;
+using namespace std;
+using namespace cv;
+int main() {
+  ObtainData("../../resources/data.yaml", "../../resources/best_img.txt");
   return 0;
 }
