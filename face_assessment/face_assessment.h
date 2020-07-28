@@ -11,14 +11,14 @@
 //#include <opencv2/imgcodecs.hpp>
 
 namespace face_assessment {
-//struct CSVRow {
+// struct CSVRow {
 //  CSVRow() = default;
 //  std::istream& readNextRow(std::istream& str);
 //
 //  std::vector<std::string> row_;
 //};
 //
-//class ImageProcessor {
+// class ImageProcessor {
 // public:
 //  ImageProcessor(std::ifstream& points_symmetry);
 //
@@ -78,7 +78,9 @@ void FindEyes(cv::Mat& src, std::vector<cv::Rect>& eyes,
               cv::CascadeClassifier eye_detector);
 void SelectTwoEyes(std::vector<cv::Rect>& eyes);
 bool Allign(cv::Mat& img, const std::vector<double>& central_line);
-void RecordFeatures(cv::Mat& img,std::ofstream& csv_file,std::string img_name);
+void RetrieveFeatures(cv::Mat& img, std::vector<double>& features);
+void RecordFeatures(const std::vector<double>& features,
+                    std::ofstream& csv_file, std::string img_name);
 }  // namespace face_assessment
 
 #endif

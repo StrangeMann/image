@@ -17,7 +17,7 @@ namespace face_assessment {
 
 const double PI = 3.14158;
 
-//std::istream& CSVRow::readNextRow(std::istream& str) {
+// std::istream& CSVRow::readNextRow(std::istream& str) {
 //  row_.clear();
 //
 //  std::string line;
@@ -30,7 +30,7 @@ const double PI = 3.14158;
 //  return str;
 //}
 //
-//ImageProcessor::ImageProcessor(std::ifstream& points_symmetry) {
+// ImageProcessor::ImageProcessor(std::ifstream& points_symmetry) {
 //  std::string line;
 //  std::getline(points_symmetry, line);
 //  std::stringstream lineStream(line);
@@ -52,11 +52,11 @@ const double PI = 3.14158;
 //  r_ranges_.resize(left_points_.size(),
 //                   std::vector<double>(left_points_.size()));
 //}
-//void ImageProcessor::DisplayImage() {
+// void ImageProcessor::DisplayImage() {
 //  cv::imshow("Display window", img_);
 //  int k = cv::waitKey(0);  // Wait for a keystroke in the window
 //}
-//bool ImageProcessor::Fill(const std::vector<std::string>& row,
+// bool ImageProcessor::Fill(const std::vector<std::string>& row,
 //                          std::string img_folder) {
 //  name_ = row.front();
 //  std::regex re("^.....[a]");
@@ -82,11 +82,11 @@ const double PI = 3.14158;
 //  }
 //  return false;
 //}
-//double ImageProcessor::Range(cv::Point2d p1, cv::Point2d p2) {
+// double ImageProcessor::Range(cv::Point2d p1, cv::Point2d p2) {
 //  return cv::norm(p1 - p2);
 //}
 //
-//void ImageProcessor::CountRanges() {
+// void ImageProcessor::CountRanges() {
 //  for (int i = 0; i < left_points_.size(); ++i) {
 //    cv::Point2d r_p1, l_p1;
 //    r_p1 = coordinates_[right_points_[i]];
@@ -100,7 +100,7 @@ const double PI = 3.14158;
 //    }
 //  }
 //}
-//void ImageProcessor::SetDiffToRatio() {
+// void ImageProcessor::SetDiffToRatio() {
 //  range_diff_.clear();
 //  for (int i = 0; i < left_points_.size(); ++i) {
 //    for (int j = i + 1; j < left_points_.size(); ++j) {
@@ -108,7 +108,7 @@ const double PI = 3.14158;
 //    }
 //  }
 //}
-//void ImageProcessor::SetDiffToSubstr() {
+// void ImageProcessor::SetDiffToSubstr() {
 //  range_diff_.clear();
 //  for (int i = 0; i < left_points_.size(); ++i) {
 //    for (int j = i + 1; j < left_points_.size(); ++j) {
@@ -116,7 +116,7 @@ const double PI = 3.14158;
 //    }
 //  }
 //}
-//double ImageProcessor::MinMaxMetric() {
+// double ImageProcessor::MinMaxMetric() {
 //  double max_diff = std::numeric_limits<decltype(max_diff)>::min();
 //  double min_diff = std::numeric_limits<decltype(min_diff)>::max();
 //  for (int i = 0; i < range_diff_.size(); ++i) {
@@ -125,10 +125,11 @@ const double PI = 3.14158;
 //  }
 //  return max_diff / min_diff;
 //}
-//double ImageProcessor::AvgMetric(int sapmling_frame, int repeats,
+// double ImageProcessor::AvgMetric(int sapmling_frame, int repeats,
 //                                 double alpha) {
 //  std::random_device rd;
-//  std::mersenne_twister_engine<uint_fast32_t, 32, 624, 397, 31, 0x9908b0df, 11,
+//  std::mersenne_twister_engine<uint_fast32_t, 32, 624, 397, 31, 0x9908b0df,
+//  11,
 //                               0xffffffff, 7, 0x9d2c5680, 15, 0xefc60000, 18,
 //                               1812433253>
 //      generator(rd());
@@ -152,7 +153,7 @@ const double PI = 3.14158;
 //  sum /= (sums.size() * (1.0 - alpha));
 //  return sum;
 //}
-//std::vector<double> ImageProcessor::Metrics() {
+// std::vector<double> ImageProcessor::Metrics() {
 //  std::vector<double> metrics;
 //  SetDiffToRatio();
 //  metrics.push_back(MinMaxMetric());
@@ -164,9 +165,9 @@ const double PI = 3.14158;
 //  metrics.push_back(CenterMetric());
 //  return metrics;
 //}
-//std::string ImageProcessor::Name() { return name_; }
+// std::string ImageProcessor::Name() { return name_; }
 //
-//std::vector<double> ImageProcessor::CenterLine() {
+// std::vector<double> ImageProcessor::CenterLine() {
 //  std::vector<double> output(4);  // vx, vy, x0, y0
 //  std::vector<cv::Point2d> input;
 //  for (int i = 0; i < central_points_.size(); ++i) {
@@ -175,7 +176,7 @@ const double PI = 3.14158;
 //  cv::fitLine(input, output, cv::DIST_L2, 0, 0.01, 0.01);
 //  return output;
 //}
-//double ImageProcessor::CenterMetric() {
+// double ImageProcessor::CenterMetric() {
 //  std::vector<double> line(CenterLine());
 //  MakeVectorUnit(line);
 //  cv::Point2d unit_vec(line[0], line[1]), reference_vec(0, 1);
@@ -183,13 +184,13 @@ const double PI = 3.14158;
 //  // DrawCenter(line);
 //  return Range(unit_vec, reference_vec);
 //}
-//void ImageProcessor::MakeVectorUnit(std::vector<double>& line) {
+// void ImageProcessor::MakeVectorUnit(std::vector<double>& line) {
 //  line[0] = abs(line[0]);
 //  line[1] = abs(line[1]);
 //  line[0] /= line[1];
 //  line[1] = 1;
 //}
-//void ImageProcessor::DrawCenter(std::vector<double>& line) {
+// void ImageProcessor::DrawCenter(std::vector<double>& line) {
 //  int t(1000);
 //  cv::Point2d p1(line[2], line[3]), p2;
 //  p2.x = p1.x + line[0] * t;
@@ -200,14 +201,14 @@ const double PI = 3.14158;
 //  cv::line(img_, p1, p2, blue);
 //}
 //
-//ImageProcessor::ImageProcessor(std::ifstream& points_symmetry,
+// ImageProcessor::ImageProcessor(std::ifstream& points_symmetry,
 //                               std::string classifier)
 //    : ImageProcessor(points_symmetry) {
 //  if (!face_detector_.load(classifier)) {
 //    std::cout << "not loaded classifier\n";
 //  }
 //}
-//void ImageProcessor::FindFace(std::vector<cv::Rect>& output) {
+// void ImageProcessor::FindFace(std::vector<cv::Rect>& output) {
 //  double scale(0.25);
 //  double face_size(0.2);
 //  cv::Mat grayscale;
@@ -224,7 +225,7 @@ const double PI = 3.14158;
 //    output[i].width /= scale;
 //  }
 //}
-//void ImageProcessor::OutlineFace() {
+// void ImageProcessor::OutlineFace() {
 //  std::vector<cv::Rect> faces;
 //  FindFace(faces);
 //  for (auto face : faces) {
@@ -232,12 +233,12 @@ const double PI = 3.14158;
 //    cv::rectangle(img_, face, red);
 //  }
 //}
-//void RotateImage(cv::Mat& img, double angle) {
+// void RotateImage(cv::Mat& img, double angle) {
 //  cv::Point center(img.cols / 2, img.rows / 2);
 //  cv::Mat rot_mat(cv::getRotationMatrix2D(center, angle, 1));
 //  cv::warpAffine(img, img, rot_mat, img.size());
 //}
-//void ImageProcessor::Rotation() {
+// void ImageProcessor::Rotation() {
 //  cv::Mat orig = img_.clone();
 //  for (int i = 0; i < 90; ++i) {
 //    img_ = orig.clone();
@@ -416,23 +417,24 @@ bool Allign(cv::Mat& img, const std::vector<double>& central_line) {
   return true;
 }
 // img should be square
-void RecordFeatures(cv::Mat& img, std::ofstream& csv_file,std::string img_name) {
-  csv_file<<img_name<<';';
+void RetrieveFeatures(cv::Mat& img, std::vector<double>& features) {
+  features.clear();
   int segments(10);  // must img.rows%segments == 0
   cv::Mat mask_l(img.rows, img.cols, CV_8UC1, cv::Scalar(0));
   cv::Mat mask_r(img.rows, img.cols, CV_8UC1, cv::Scalar(0));
   for (int y = 0; y < segments; ++y) {
     for (int x = 0; x < segments / 2; ++x) {
-      cv::Point p1(x * (img.cols / segments), y * (img.rows / segments));
-      cv::Point p2(p1.x + (img.cols / segments), p1.y + (img.rows / segments));
-      rectangle(mask_l, p1, p2, cv::Scalar(255), cv::LineTypes::FILLED);
-      p1.x += img.cols / 2;
-      p2.x += img.cols / 2;
-      rectangle(mask_r, p1, p2, cv::Scalar(255), cv::LineTypes::FILLED);
+      cv::Point l_p1(x * (img.cols / segments), y * (img.rows / segments));
+      cv::Point l_p2(l_p1.x + (img.cols / segments),
+                     l_p1.y + (img.rows / segments));
+      cv::Point r_p1(img.cols - l_p1.x, y * (img.rows / segments));
+      cv::Point r_p2(img.cols - l_p2.x, l_p1.y + (img.rows / segments));
+      rectangle(mask_l, l_p1, l_p2, cv::Scalar(255), cv::LineTypes::FILLED);
+      rectangle(mask_r, r_p1, r_p2, cv::Scalar(255), cv::LineTypes::FILLED);
 
-      // imshow("mask_l", mask_l);
-      // imshow("mask_r", mask_r);
-      // cv::waitKey();
+      //imshow("mask_l", mask_l);
+      //imshow("mask_r", mask_r);
+      //cv::waitKey();
 
       cv::Mat hist_l, hist_r;
       std::vector<cv::Mat> img_wrapper{img};
@@ -444,15 +446,20 @@ void RecordFeatures(cv::Mat& img, std::ofstream& csv_file,std::string img_name) 
       cv::calcHist(img_wrapper, channels, mask_r, hist_r, histSize, ranges);
       double metric = cv::compareHist(hist_l, hist_r,
                                       cv::HistCompMethods::HISTCMP_CHISQR_ALT);
-      csv_file<<metric<<';';
+      features.push_back(metric);
 
-      rectangle(mask_r, p1, p2, cv::Scalar(0), cv::LineTypes::FILLED);
-      p1.x -= img.cols / 2;
-      p2.x -= img.cols / 2;
-      rectangle(mask_l, p1, p2, cv::Scalar(0), cv::LineTypes::FILLED);
+      rectangle(mask_l, l_p1, l_p2, cv::Scalar(0), cv::LineTypes::FILLED);
+      rectangle(mask_r, r_p1, r_p2, cv::Scalar(0), cv::LineTypes::FILLED);
     }
   }
-  csv_file<<'\n';
+}
+void RecordFeatures(const std::vector<double>& features,
+                    std::ofstream& csv_file, std::string img_name) {
+  csv_file << img_name << ';';
+  for (int i = 0; i < features.size(); ++i) {
+    csv_file << features[i] << ';';
+  }
+  csv_file << '\n';
 }
 }  // namespace face_assessment
 
@@ -504,8 +511,10 @@ int main() {
       Mat LBP_img;
       OLBP_<char>(cut_img, LBP_img);
       imshow("OLBP image", LBP_img);
-      RecordFeatures(LBP_img, data,entry.path().filename().string());
-      //waitKey();
+      std::vector<double> features;
+      RetrieveFeatures(LBP_img, features);
+      RecordFeatures(features, data, entry.path().filename().string());
+      // waitKey();
     }
   }
   // double eps(0.02);
