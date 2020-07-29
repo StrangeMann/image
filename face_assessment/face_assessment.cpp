@@ -408,7 +408,7 @@ std::vector<double> CenterLine(cv::Point2d a, cv::Point2d b) {
 }
 bool Allign(cv::Mat& img, const std::vector<double>& central_line) {
   double alpha = atan2(central_line[0], central_line[1]) * 180 / PI;
-  std::cout << alpha << '\n';
+  // std::cout << alpha << '\n';
   if (abs(alpha) > 20) {
     return false;
   }
@@ -418,18 +418,19 @@ bool Allign(cv::Mat& img, const std::vector<double>& central_line) {
   return true;
 }
 // img should be square
-void RetrieveFeatures(cv::Mat& img, std::vector<double>& features) {
+void RetrieveFeatures(cv::Mat& img, std::vector<double>& features,
+                      int n_zones) {
   features.clear();
-  int segments(10);  // must img.rows%segments == 0
+  // int n_zones(10);  // must img.rows%segments == 0
   cv::Mat mask_l(img.rows, img.cols, CV_8UC1, cv::Scalar(0));
   cv::Mat mask_r(img.rows, img.cols, CV_8UC1, cv::Scalar(0));
-  for (int y = 0; y < segments; ++y) {
-    for (int x = 0; x < segments / 2; ++x) {
-      cv::Point l_p1(x * (img.cols / segments), y * (img.rows / segments));
-      cv::Point l_p2(l_p1.x + (img.cols / segments),
-                     l_p1.y + (img.rows / segments));
-      cv::Point r_p1(img.cols - l_p1.x, y * (img.rows / segments));
-      cv::Point r_p2(img.cols - l_p2.x, l_p1.y + (img.rows / segments));
+  for (int y = 0; y < n_zones; ++y) {
+    for (int x = 0; x < n_zones / 2; ++x) {
+      cv::Point l_p1(x * (img.cols / n_zones), y * (img.rows / n_zones));
+      cv::Point l_p2(l_p1.x + (img.cols / n_zones),
+                     l_p1.y + (img.rows / n_zones));
+      cv::Point r_p1(img.cols - l_p1.x, y * (img.rows / n_zones));
+      cv::Point r_p2(img.cols - l_p2.x, l_p1.y + (img.rows / n_zones));
       rectangle(mask_l, l_p1, l_p2, cv::Scalar(255), cv::LineTypes::FILLED);
       rectangle(mask_r, r_p1, r_p2, cv::Scalar(255), cv::LineTypes::FILLED);
 
@@ -454,12 +455,7 @@ void RetrieveFeatures(cv::Mat& img, std::vector<double>& features) {
     }
   }
 }
-void RecordFeature(const DataRow& row, cv::FileStorage& output) {
-  output << "{:"
-         << "name" << row.name << "features" << row.features << "is_right"
-         << row.is_right << "}";
-}
-bool ObtainData(std::string path, std::string right_images_txt) {
+bool ObtainData(std::string path, std::string right_images_txt, int n_zones) {
   using namespace face_assessment;
   using namespace std;
   using namespace cv;
@@ -470,12 +466,12 @@ bool ObtainData(std::string path, std::string right_images_txt) {
   std::vector<std::string> right_images;
   std::string inp_name;
   while (input >> inp_name) {
-    right_images.push_back(inp_name);
+    right_images.push_back(inp_name + ".jpg");
   }
-  int im = 0;
+  input.close();
 
   cv::FileStorage output(path, cv::FileStorage::WRITE);
-  output << "features"
+  output << "samples"
          << "[";
 
   std::string image_path("../../resources/jpg/");
@@ -486,15 +482,18 @@ bool ObtainData(std::string path, std::string right_images_txt) {
   CascadeClassifier eye_detector_r;
   eye_detector_r.load("../../resources/haarcascade_righteye_2splits.xml");
 
-  for (const auto& entry : std::filesystem::directory_iterator(image_path)) {
-    Mat image = imread(entry.path().string(), IMREAD_GRAYSCALE);
-    DataRow row;
-    row.is_right = false;
-    std::string right_name = right_images[im] + ".jpg";
-    row.name = entry.path().filename().string();
-    if (im < right_images.size() && right_name == row.name) {
-      row.is_right = true;
-      ++im;
+  auto dir_it(
+      std::filesystem::begin(std::filesystem::directory_iterator(image_path)));
+  auto dir_end(
+      std::filesystem::end(std::filesystem::directory_iterator(image_path)));
+  for (; dir_it != dir_end; ++dir_it) {
+    Mat image = imread(dir_it->path().string(), IMREAD_GRAYSCALE);
+    Sample row;
+    row.is_right_ = false;
+    row.name_ = dir_it->path().filename().string();
+    if (std::find(right_images.begin(), right_images.end(), row.name_) !=
+        right_images.end()) {
+      row.is_right_ = true;
     }
     // imshow("image", image);
 
@@ -507,19 +506,21 @@ bool ObtainData(std::string path, std::string right_images_txt) {
     SelectTwoEyes(eyes);
     if (eyes.size() == 2) {
       std::vector<double> central_line(SplitFace(image, eyes));
-      if (!central_line.empty()) {
-        int t(100);
-        cv::line(image, cv::Point2d(central_line[2], central_line[3]),
-                 cv::Point2d(central_line[2] + central_line[0] * t,
-                             central_line[3] + central_line[1] * t),
-                 cv::Scalar(255));
-      }
+      // if (!central_line.empty()) {
+      //  int t(100);
+      //  cv::line(image, cv::Point2d(central_line[2], central_line[3]),
+      //           cv::Point2d(central_line[2] + central_line[0] * t,
+      //                       central_line[3] + central_line[1] * t),
+      //           cv::Scalar(255));
+      //}
       if (!Allign(image, central_line)) {
+        ++dir_it;
         continue;
       }
       // imshow("image_center", image);
       Mat cut_img;
       if (!CutFace(image, cut_img, face_detector, central_line)) {
+        ++dir_it;
         continue;
       }
       // imshow("cut_img", image);
@@ -527,12 +528,261 @@ bool ObtainData(std::string path, std::string right_images_txt) {
       OLBP_<char>(cut_img, LBP_img);
 
       imshow("OLBP image", LBP_img);
-      RetrieveFeatures(LBP_img, row.features);
-      RecordFeature(row, output);
+      RetrieveFeatures(LBP_img, row.features_, n_zones);
+      output << row;
     }
+    std::cout << dir_it->path().filename().string() << '\n';
   }
   output << "]";
   output.release();
+  cvDestroyAllWindows();
+  return true;
+}
+void Sample::write(cv::FileStorage& output) const {
+  output << "{:"
+         << "name" << name_ << "features" << features_ << "is_right"
+         << is_right_ << "}";
+}
+void Sample::read(const cv::FileNode& node) {
+  name_ = node["name"];
+  cv::FileNode features = node["features"];
+  if (features.type() != cv::FileNode::SEQ) {
+    std::cerr << "not a sequence! FAIL" << '\n';
+    return;
+  }
+  cv::FileNodeIterator it = features.begin(), it_end = features.end();
+  for (; it != it_end; ++it) {
+    features_.push_back((double)(*it));
+  }
+  is_right_ = (int)node["is_right"];
+}
+static void write(cv::FileStorage& fs, const std::string&, const Sample& x) {
+  x.write(fs);
+}
+static void read(const cv::FileNode& node, Sample& x,
+                 const Sample& default_value) {
+  if (node.empty())
+    x = default_value;
+  else
+    x.read(node);
+}
+Stump::Stump() : feature_(-1), threshold_(0), weight_(0) {}
+Stump::Stump(int feature, double threshold, double weight)
+    : feature_(feature), threshold_(threshold), weight_(weight) {}
+void Stump::SetWeight(double error) {
+  weight_ = 0.5 * log((1.0 - error) / error);
+}
+bool Stump::Classify(const Sample& sample) {
+  if (sample.features_[feature_] < threshold_) {
+    return true;
+  }
+  return false;
+}
+void Stump::write(cv::FileStorage& output) const {
+  output << "{:"
+         << "feature" << feature_ << "threshold" << threshold_ << "weight"
+         << weight_ << "}";
+}
+void Stump::read(const cv::FileNode& node) {
+  feature_ = (int)node["feature"];
+  threshold_ = (double)node["threshold"];
+  weight_ = (double)node["weight"];
+}
+static void write(cv::FileStorage& fs, const std::string&, const Stump& x) {
+  x.write(fs);
+}
+static void read(const cv::FileNode& node, Stump& x,
+                 const Stump& default_value) {
+  if (node.empty())
+    x = default_value;
+  else
+    x.read(node);
+}
+void TeachAdaBoost(std::string input, std::string output,
+                   double use_for_learning_part, int n_stumps) {
+  std::vector<DataRow> samples;
+  ReadData(input, samples);
+  std::vector<DataRow> assessment_dataset;
+  SeparateDataset(samples, assessment_dataset, use_for_learning_part);
+
+  std::vector<Stump> stumps(n_stumps);
+  for (int i = 0; i < stumps.size(); ++i) {
+    cv::FileStorage fs(output, cv::FileStorage::WRITE);
+    stumps[i] = GetBestStump(samples);
+    UpdateDataset(samples, stumps[i]);
+    fs << "stumps" << stumps;
+    fs.release();
+  }
+  AssignByAdaBoost(assessment_dataset,stumps);
+}
+void AssignByAdaBoost(std::vector<DataRow>& data,std::vector<Stump>& stumps){
+  for(int i = 0;i<data.size();++i){
+    double yes(0);
+    double no(0);
+    for(int j = 0;j<stumps.size();++j){
+      if(stumps[j].Classify(data[i].data_)){
+        yes+=stumps[j].weight_;
+      }else{
+        no+=stumps[j].weight_;
+      }
+    }
+    if(yes>no){
+      std::cout<<"yes\n";
+    }else{
+      std::cout<<"no\n";
+    }
+  }
+}
+Stump GetBestStump(std::vector<DataRow>& samples) {
+  std::pair<Stump, double> best_stump(Stump(), 2);
+  for (int i = 0; i < samples[0].data_.features_.size(); ++i) {
+    auto stump(FindThreshold(samples, i));
+    stump.first.weight_ *= samples.size() * samples[i].weight_;
+    //std::cout << stump.second << ' ' << best_stump.second << ' '
+    //          << stump.first.feature_ << '\n';
+    if (stump.second < best_stump.second) {
+      best_stump = stump;
+      if (best_stump.second == 0) {
+        break;
+      }
+    }
+  }
+  return best_stump.first;
+}
+void UpdateDataset(std::vector<DataRow>& samples, Stump stump) {
+  double sum(0);
+  for (int i = 0; i < samples.size(); ++i) {
+    if (stump.Classify(samples[i].data_) == samples[i].data_.is_right_) {
+      samples[i].weight_ = DecreasedWeight(samples[i].weight_, stump.weight_);
+    } else {
+      samples[i].weight_ = IncreasedWeight(samples[i].weight_, stump.weight_);
+    }
+    sum += samples[i].weight_;
+  }
+  for (int i = 0; i < samples.size(); ++i) {
+    samples[i].weight_ /= sum;
+  }
+}
+
+double IncreasedWeight(double weight, double stump_weight) {
+  return weight * exp(stump_weight);
+}
+double DecreasedWeight(double weight, double stump_weight) {
+  return weight * exp(-stump_weight);
+}
+void ReadData(std::string input, std::vector<DataRow>& output) {
+  cv::FileStorage file(input, cv::FileStorage::READ);
+  cv::FileNode samples = file["samples"];
+  if (samples.type() != cv::FileNode::SEQ) {
+    std::cerr << "not a sequence" << '\n';
+    file.release();
+    return;
+  }
+  cv::FileNodeIterator s_it = samples.begin(), s_it_end = samples.end();
+  double weight = 1.0 / samples.size();
+  for (; s_it != s_it_end; ++s_it) {
+    output.push_back(DataRow());
+    output.back().weight_ = weight;
+    output.back().data_ = Sample();
+    (*s_it) >> output.back().data_;
+  }
+  file.release();
+}
+
+void SeparateDataset(std::vector<DataRow>& samples,
+                     std::vector<DataRow>& assessment_dataset,
+                     double use_for_learning_part) {
+  assessment_dataset.clear();
+  int i = samples.size() * use_for_learning_part;
+  for (; i < samples.size(); ++i) {
+    assessment_dataset.push_back(samples[i]);
+  }
+  assessment_dataset.resize(i);
+}
+// stump, gini impurity. samples.size()!=0 is assumed
+std::pair<Stump, double> FindThreshold(std::vector<DataRow>& samples,
+                                       int column) {
+  std::sort(samples.begin(), samples.end(),
+            [&](const DataRow& a, const DataRow& b) {
+              return a.data_.features_[column] < b.data_.features_[column];
+            });
+  std::pair<Stump, double> best(Stump(column, 0, 0),
+                                std::numeric_limits<double>::max());
+  if (samples.size() == 1) {
+    best.first.threshold_ = samples[0].data_.features_[0];
+    best.second = 0;
+  } else {
+    for (int i = 1; i < samples.size(); ++i) {
+      Stump stump(column,
+                  (samples[i].data_.features_[column] +
+                   samples[i - 1].data_.features_[column]) /
+                      2,
+                  0);
+      double impurity(GiniImpurity(Occurances(samples, stump)));
+      if (impurity < best.second) {
+        best.second = impurity;
+        best.first = stump;
+      }
+    }
+  }
+  return best;
+}
+// yes for true, no for true, yes for false, no for false
+std::tuple<int, int, int, int> Occurances(std::vector<DataRow>& samples,
+                                          Stump& stump) {
+  std::tuple<int, int, int, int> res(
+      0, 0, 0, 0);  // yes for true, no for true, yes for false, no for false;
+                    // <threshold is yes, >=threshold is no
+  double error(0);
+  for (int i = 0; i < samples.size(); ++i) {
+    if (samples[i].data_.is_right_) {
+      if (samples[i].data_.features_[stump.feature_] < stump.threshold_) {
+        std::get<0>(res) += 1;
+      } else {
+        std::get<1>(res) += 1;
+        error += samples[i].weight_;
+      }
+    } else {
+      if (samples[i].data_.features_[stump.feature_] < stump.threshold_) {
+        std::get<2>(res) += 1;
+        error += samples[i].weight_;
+      } else {
+        std::get<3>(res) += 1;
+      }
+    }
+  }
+  stump.SetWeight(error);
+  return res;
+}
+double GiniImpurity(double p1, double p2) { return 1.0 - p1 * p1 - p2 * p2; }
+double GiniImpurity(std::tuple<int, int, int, int> occurances) {
+  double o1 = static_cast<double>(std::get<0>(occurances));
+  double o2 = static_cast<double>(std::get<1>(occurances));
+  double o3 = static_cast<double>(std::get<2>(occurances));
+  double o4 = static_cast<double>(std::get<3>(occurances));
+  double p1, p2, p3, p4, w1, w2;
+  if (o1 + o2 != 0) {
+    p1 = o1 / (o1 + o2);
+    p2 = 1.0 - p1;
+  } else {
+    p1 = 0;
+    p2 = 0;
+  }
+  if (o3 + o4 != 0) {
+    p3 = o3 / (o3 + o4);
+    p4 = 1.0 - p3;
+  } else {
+    p3 = 0;
+    p4 = 0;
+  }
+  if (o1 + o2 + o3 + o4 != 0) {
+    w1 = (o1 + o2) / (o1 + o2 + o3 + o4);
+    w2 = 1.0 - w1;
+  } else {
+    w1 = 0;
+    w2 = 0;
+  }
+  return GiniImpurity(p1, p2) * w1 + GiniImpurity(p3, p4) * w2;
 }
 }  // namespace face_assessment
 
@@ -540,6 +790,9 @@ using namespace face_assessment;
 using namespace std;
 using namespace cv;
 int main() {
-  ObtainData("../../resources/data.yaml", "../../resources/best_img.txt");
+  // ObtainData("../../resources/data3.yaml", "../../resources/best_img.txt",
+  //           50);  // 200%n_zones==0 must be true
+  TeachAdaBoost("../../resources/data.yaml", "../../resources/adaboost2.yaml",
+                0.75, 100);
   return 0;
 }

@@ -64,10 +64,19 @@ namespace face_assessment {
 //
 //  cv::CascadeClassifier face_detector_;
 //};
+struct Sample {
+  void write(cv::FileStorage& output) const;
+  void read(const cv::FileNode& node);
+  std::string name_;
+  std::vector<double> features_;
+  bool is_right_;
+};
+static void write(cv::FileStorage& fs, const std::string&, const Sample& x);
+static void read(const cv::FileNode& node, Sample& x,
+                 const Sample& default_value = Sample());
 struct DataRow {
-  std::string name;
-  std::vector<double> features;
-  bool is_right;
+  Sample data_;
+  double weight_;
 };
 
 template <typename _Tp>
@@ -83,10 +92,46 @@ void FindEyes(cv::Mat& src, std::vector<cv::Rect>& eyes,
               cv::CascadeClassifier eye_detector);
 void SelectTwoEyes(std::vector<cv::Rect>& eyes);
 bool Allign(cv::Mat& img, const std::vector<double>& central_line);
-void RetrieveFeatures(cv::Mat& img, std::vector<double>& features);
-void RecordFeature(const DataRow& row, cv::FileStorage& output);
-bool ObtainData(std::string path, std::string right_images_txt);
+void RetrieveFeatures(cv::Mat& img, std::vector<double>& features,int n_zones);
+// in current implementation 200%n_zones==0 must be true
+bool ObtainData(std::string path, std::string right_images_txt,int n_zones);
 
+struct Stump {
+  Stump();
+  Stump(int feature, double threshold, double weight);
+
+  void SetWeight(double error);
+  bool Classify(const Sample& sample);
+
+  void write(cv::FileStorage& output) const;
+  void read(const cv::FileNode& node);
+
+  int feature_;
+  double threshold_;
+  double weight_;
+};
+static void write(cv::FileStorage& fs, const std::string&, const Stump& x);
+static void read(const cv::FileNode& node, Stump& x,
+                 const Stump& default_value = Stump());
+void TeachAdaBoost(std::string input, std::string output,
+                   double use_for_learning_part, int n_stumps);
+void ReadData(std::string input, std::vector<DataRow>& output);
+void SeparateDataset(std::vector<DataRow>& samples,
+                     std::vector<DataRow>& assessment_dataset,
+                     double use_for_learning_part);
+std::pair<Stump, double> FindThreshold(std::vector<DataRow>& samples,
+                                       int column);  // Stump, gini impurity
+std::tuple<int, int, int, int> Occurances(
+    std::vector<DataRow>& samples,
+    Stump& stump);  // yes for true, no for true, yes for false, no for false
+double GiniImpurity(std::tuple<int, int, int, int> occurances);
+double GiniImpurity(double p1, double p2);
+Stump GetBestStump(std::vector<DataRow>& samples);
+void UpdateDataset(std::vector<DataRow>& samples, Stump stump);
+double IncreasedWeight(double weight, double stump_weight);
+double DecreasedWeight(double weight, double stump_weight);
+
+void AssignByAdaBoost(std::vector<DataRow>& data,std::vector<Stump>& stumps);
 }  // namespace face_assessment
 
 #endif
