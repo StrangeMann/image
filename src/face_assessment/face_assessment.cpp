@@ -1,5 +1,6 @@
 #include "face_assessment.h"
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -338,9 +339,45 @@ bool CutFace(cv::Mat& src, cv::Mat& dest, cv::CascadeClassifier& face_detector,
     faces[0].x += (faces[0].width - width);
     faces[0].width = width;
   }
+  FitRect(faces[0], src);
   dest = cv::Mat(src, faces[0]).clone();
   resize(dest, dest, cv::Size(202, 202));
   return true;
+}
+
+void FitRect(cv::Rect& rect, cv::Mat& mat) {
+  if (rect.width < 0) {
+    rect.x += rect.width;
+    rect.width = -rect.width;
+  }
+  if (rect.height < 0) {
+    rect.y += rect.height;
+    rect.height = -rect.height;
+  }
+  if (rect.x + rect.width >= mat.cols) {
+    rect.width = mat.cols - 1 - rect.x;
+  }
+  if (rect.x + rect.width < 0) {
+    rect.width = -rect.x;
+  }
+  if (rect.y + rect.height >= mat.rows) {
+    rect.height = mat.rows - 1 - rect.y;
+  }
+  if (rect.y + rect.height < 0) {
+    rect.height = -rect.y;
+  }
+  if (rect.x < 0) {
+    rect.x = 0;
+  }
+  if (rect.y < 0) {
+    rect.y = 0;
+  }
+  if (rect.x >= mat.cols) {
+    rect.x = mat.cols - 1;
+  }
+  if (rect.y >= mat.rows) {
+    rect.y = mat.rows - 1;
+  }
 }
 void FindEyes(cv::Mat& src, std::vector<cv::Rect>& eyes,
               cv::CascadeClassifier eye_detector) {
@@ -455,33 +492,35 @@ void RetrieveFeatures(cv::Mat& img, std::vector<double>& features,
     }
   }
 }
-bool ObtainData(std::string path, std::string right_images_txt, int n_zones) {
+bool ObtainData(std::string right_path, std::string wrong_path,
+                std::string output_path, int n_zones) {
   using namespace face_assessment;
   using namespace std;
   using namespace cv;
-  std::ifstream input(right_images_txt);
-  if (!input.is_open()) {
-    return false;
-  }
-  std::vector<std::string> right_images;
-  std::string inp_name;
-  while (input >> inp_name) {
-    right_images.push_back(inp_name + ".jpg");
-  }
-  input.close();
-
-  cv::FileStorage output(path, cv::FileStorage::WRITE);
-  output << "samples"
-         << "[";
-
-  std::string image_path("../../resources/jpg/");
   CascadeClassifier face_detector;
   face_detector.load("../../resources/haarcascade_frontalface_default.xml");
   CascadeClassifier eye_detector_l;
   eye_detector_l.load("../../resources/haarcascade_lefteye_2splits.xml");
   CascadeClassifier eye_detector_r;
   eye_detector_r.load("../../resources/haarcascade_righteye_2splits.xml");
-
+  cv::FileStorage output(output_path, cv::FileStorage::WRITE);
+  output << "samples"
+         << "[";
+  AddData(right_path, true, output, face_detector, eye_detector_l,
+          eye_detector_r, n_zones);
+  AddData(wrong_path, false, output, face_detector, eye_detector_l,
+          eye_detector_r, n_zones);
+  output << "]";
+  output.release();
+  cvDestroyAllWindows();
+  return true;
+}
+void AddData(std::string image_path, bool is_right, cv::FileStorage& output,
+             cv::CascadeClassifier& face_detector,
+             cv::CascadeClassifier& eye_detector_l,
+             cv::CascadeClassifier& eye_detector_r, int n_zones) {
+  using namespace std;
+  using namespace cv;
   auto dir_it(
       std::filesystem::begin(std::filesystem::directory_iterator(image_path)));
   auto dir_end(
@@ -489,12 +528,15 @@ bool ObtainData(std::string path, std::string right_images_txt, int n_zones) {
   for (; dir_it != dir_end; ++dir_it) {
     Mat image = imread(dir_it->path().string(), IMREAD_GRAYSCALE);
     Sample row;
-    row.is_right_ = false;
+    row.is_right_ = is_right;
     row.name_ = dir_it->path().filename().string();
-    if (std::find(right_images.begin(), right_images.end(), row.name_) !=
-        right_images.end()) {
-      row.is_right_ = true;
-    }
+    // std::regex rx("58_");
+    // if (!regex_search(row.name_.begin(), row.name_.end(), rx)) {
+    //  ++dir_it;
+    //  continue;
+    //} else {
+    //  int a = 3;
+    //}
     // imshow("image", image);
 
     vector<Rect> eyes_r, eyes_l;
@@ -506,13 +548,6 @@ bool ObtainData(std::string path, std::string right_images_txt, int n_zones) {
     SelectTwoEyes(eyes);
     if (eyes.size() == 2) {
       std::vector<double> central_line(SplitFace(image, eyes));
-      // if (!central_line.empty()) {
-      //  int t(100);
-      //  cv::line(image, cv::Point2d(central_line[2], central_line[3]),
-      //           cv::Point2d(central_line[2] + central_line[0] * t,
-      //                       central_line[3] + central_line[1] * t),
-      //           cv::Scalar(255));
-      //}
       if (!Allign(image, central_line)) {
         ++dir_it;
         continue;
@@ -523,20 +558,18 @@ bool ObtainData(std::string path, std::string right_images_txt, int n_zones) {
         ++dir_it;
         continue;
       }
-      // imshow("cut_img", image);
+      // imshow("cut_img", cut_img);
+
       Mat LBP_img;
       OLBP_<char>(cut_img, LBP_img);
 
-      imshow("OLBP image", LBP_img);
+      // imshow("OLBP image", LBP_img);
       RetrieveFeatures(LBP_img, row.features_, n_zones);
       output << row;
+      // cv::waitKey();
     }
     std::cout << dir_it->path().filename().string() << '\n';
   }
-  output << "]";
-  output.release();
-  cvDestroyAllWindows();
-  return true;
 }
 void Sample::write(cv::FileStorage& output) const {
   output << "{:"
@@ -570,9 +603,18 @@ Stump::Stump() : feature_(-1), threshold_(0), weight_(0) {}
 Stump::Stump(int feature, double threshold, double weight)
     : feature_(feature), threshold_(threshold), weight_(weight) {}
 void Stump::SetWeight(double error) {
+  if (error == 0) {
+    error += std::numeric_limits<decltype(error)>::epsilon();
+  }
+  if (error >= 1) {
+    error = 1 - std::numeric_limits<decltype(error)>::epsilon();
+  }
   weight_ = 0.5 * log((1.0 - error) / error);
 }
 bool Stump::Classify(const Sample& sample) {
+  if (feature_ < 0 || feature_ >= sample.features_.size()) {
+    int b = 3;
+  }
   if (sample.features_[feature_] < threshold_) {
     return true;
   }
@@ -599,53 +641,140 @@ static void read(const cv::FileNode& node, Stump& x,
     x.read(node);
 }
 void TeachAdaBoost(std::string input, std::string output,
-                   double use_for_learning_part, int n_stumps) {
+                   std::string assessment_path, double use_for_learning_part,
+                   int n_stumps) {
   std::vector<DataRow> samples;
   ReadData(input, samples);
-  std::vector<DataRow> assessment_dataset;
+  NormalizeDataset(samples);
+  std::vector<Sample> assessment_dataset;
   SeparateDataset(samples, assessment_dataset, use_for_learning_part);
+  cv::FileStorage assessment_fs(assessment_path, cv::FileStorage::WRITE);
+  assessment_fs << "samples" << assessment_dataset;
+  assessment_fs.release();
 
   std::vector<Stump> stumps(n_stumps);
   for (int i = 0; i < stumps.size(); ++i) {
     cv::FileStorage fs(output, cv::FileStorage::WRITE);
     stumps[i] = GetBestStump(samples);
     UpdateDataset(samples, stumps[i]);
+    if (i % 20 == 0) {
+      RemoveNoize(samples,0.01);
+    }
     fs << "stumps" << stumps;
     fs.release();
   }
-  AssignByAdaBoost(assessment_dataset,stumps);
 }
-void AssignByAdaBoost(std::vector<DataRow>& data,std::vector<Stump>& stumps){
-  for(int i = 0;i<data.size();++i){
-    double yes(0);
-    double no(0);
-    for(int j = 0;j<stumps.size();++j){
-      if(stumps[j].Classify(data[i].data_)){
-        yes+=stumps[j].weight_;
-      }else{
-        no+=stumps[j].weight_;
-      }
-    }
-    if(yes>no){
-      std::cout<<"yes\n";
-    }else{
-      std::cout<<"no\n";
+
+void RemoveNoize(std::vector<DataRow>& samples, double median_eps) {
+  std::sort(samples.begin(), samples.end(),
+            [&](const DataRow& a, const DataRow& b) {
+              return a.weight_ < b.weight_;
+            });
+  double median = samples[samples.size()/2].weight_;
+  std::vector<DataRow> res;
+  for(int i = 0;i<samples.size();++i){
+    if(samples[i].weight_-median<median_eps){
+      res.push_back(samples[i]);
     }
   }
+  samples =res;
+  for(int i = 0;i<samples.size();++i){
+    samples[i].weight_/=samples.size();
+  }
+}
+void NormalizeDataset(std::vector<DataRow>& samples) {
+  int count(0);
+  for (int i = 0; i < samples.size(); ++i) {
+    if (samples[i].data_.is_right_) {
+      ++count;
+    } else {
+      int size(-1);
+      if (count > samples.size() / 2) {
+        size = samples.size() - count;
+        int k = samples.size() - 1;
+        for (int j = size; j < size * 2; ++j) {
+          samples[j] = samples[k];
+          --k;
+        }
+      } else {
+        size = count;
+      }
+      samples.resize(size * 2);
+      break;
+    }
+  }
+  if (count == samples.size()) {
+    std::cout << "no false samples\n";
+  } else {
+    std::random_device device;
+    std::mt19937 generator(device());
+    std::shuffle(samples.begin(), samples.end(), generator);
+    for (int i = 0; i < samples.size(); ++i) {
+      samples[i].weight_ = 1.0 / samples.size();
+    }
+  }
+}
+void ReadSamples(std::string data_path, std::vector<Sample>& output) {
+  output.clear();
+  cv::FileStorage fs(data_path, cv::FileStorage::READ);
+  auto samples = fs["samples"];
+  cv::FileNodeIterator it = samples.begin(), it_end = samples.end();
+  for (; it != it_end; ++it) {
+    Sample sample;
+    (*it) >> sample;
+    output.push_back(sample);
+  }
+  fs.release();
+}
+void ReadStumps(std::string data_path, std::vector<Stump>& output) {
+  output.clear();
+  cv::FileStorage fs(data_path, cv::FileStorage::READ);
+  auto samples = fs["stumps"];
+  cv::FileNodeIterator it = samples.begin(), it_end = samples.end();
+  for (; it != it_end; ++it) {
+    Stump stump;
+    (*it) >> stump;
+    output.push_back(stump);
+  }
+  fs.release();
+}
+void AssignByAdaBoost(std::vector<Sample>& data, std::vector<Stump>& stumps) {
+  int correct_count(0);
+  for (int i = 0; i < data.size(); ++i) {
+    if (i == data.size() - 1) {
+      int a = 3;
+    }
+    double yes(0);
+    double no(0);
+    for (int j = 0; j < stumps.size(); ++j) {
+      if (stumps[j].Classify(data[i])) {
+        yes += stumps[j].weight_;
+      } else {
+        no += stumps[j].weight_;
+      }
+    }
+    // std::cout<<((yes>no)==data[i].is_right_)<<'\n';
+    if ((yes > no) == data[i].is_right_) {
+      correct_count += 1;
+    }
+  }
+  std::cout << correct_count << ' ' << data.size() << '\n';
 }
 Stump GetBestStump(std::vector<DataRow>& samples) {
   std::pair<Stump, double> best_stump(Stump(), 2);
   for (int i = 0; i < samples[0].data_.features_.size(); ++i) {
     auto stump(FindThreshold(samples, i));
-    stump.first.weight_ *= samples.size() * samples[i].weight_;
-    //std::cout << stump.second << ' ' << best_stump.second << ' '
+    // std::cout << stump.second << ' ' << best_stump.second << ' '
     //          << stump.first.feature_ << '\n';
-    if (stump.second < best_stump.second) {
+    if (stump.first.weight_ > best_stump.first.weight_) {
       best_stump = stump;
-      if (best_stump.second == 0) {
-        break;
-      }
     }
+    // if (stump.second < best_stump.second) {
+    //  best_stump = stump;
+    //  if (best_stump.second == 0) {
+    //    break;
+    //  }
+    //}
   }
   return best_stump.first;
 }
@@ -663,7 +792,22 @@ void UpdateDataset(std::vector<DataRow>& samples, Stump stump) {
     samples[i].weight_ /= sum;
   }
 }
-
+void PickData(std::vector<DataRow>& samples) {
+  std::vector<double> probabilities;
+  for (int i = 0; i < samples.size(); ++i) {
+    probabilities.push_back(samples[i].weight_);
+  }
+  std::discrete_distribution distribution(probabilities.begin(),
+                                          probabilities.end());
+  std::random_device device;
+  std::mt19937 generator(device());
+  std::vector<DataRow> new_samples;
+  for (int i = 0; i < samples.size(); ++i) {
+    new_samples.push_back(samples[distribution(generator)]);
+    new_samples.back().weight_ = 1.0 / samples.size();
+  }
+  samples = new_samples;
+}
 double IncreasedWeight(double weight, double stump_weight) {
   return weight * exp(stump_weight);
 }
@@ -690,14 +834,17 @@ void ReadData(std::string input, std::vector<DataRow>& output) {
 }
 
 void SeparateDataset(std::vector<DataRow>& samples,
-                     std::vector<DataRow>& assessment_dataset,
+                     std::vector<Sample>& assessment_dataset,
                      double use_for_learning_part) {
   assessment_dataset.clear();
-  int i = samples.size() * use_for_learning_part;
-  for (; i < samples.size(); ++i) {
-    assessment_dataset.push_back(samples[i]);
+  for (int i = samples.size() * use_for_learning_part; i < samples.size();
+       ++i) {
+    assessment_dataset.push_back(samples[i].data_);
   }
-  assessment_dataset.resize(i);
+  samples.resize(samples.size() * use_for_learning_part);
+  for (int i = 0; i < samples.size(); ++i) {
+    samples[i].weight_ = 1.0 / samples.size();
+  }
 }
 // stump, gini impurity. samples.size()!=0 is assumed
 std::pair<Stump, double> FindThreshold(std::vector<DataRow>& samples,
@@ -706,8 +853,10 @@ std::pair<Stump, double> FindThreshold(std::vector<DataRow>& samples,
             [&](const DataRow& a, const DataRow& b) {
               return a.data_.features_[column] < b.data_.features_[column];
             });
+  // std::pair<Stump, double> best(Stump(column, 0, 0),
+  //                              std::numeric_limits<double>::max());
   std::pair<Stump, double> best(Stump(column, 0, 0),
-                                std::numeric_limits<double>::max());
+                                std::numeric_limits<double>::min());
   if (samples.size() == 1) {
     best.first.threshold_ = samples[0].data_.features_[0];
     best.second = 0;
@@ -718,11 +867,15 @@ std::pair<Stump, double> FindThreshold(std::vector<DataRow>& samples,
                    samples[i - 1].data_.features_[column]) /
                       2,
                   0);
-      double impurity(GiniImpurity(Occurances(samples, stump)));
-      if (impurity < best.second) {
-        best.second = impurity;
+      Occurances(samples, stump);
+      if (stump.weight_ > best.first.weight_) {
         best.first = stump;
       }
+      // double impurity(GiniImpurity(Occurances(samples, stump)));
+      // if (impurity < best.second) {
+      //  best.second = impurity;
+      //  best.first = stump;
+      //}
     }
   }
   return best;
@@ -735,15 +888,15 @@ std::tuple<int, int, int, int> Occurances(std::vector<DataRow>& samples,
                     // <threshold is yes, >=threshold is no
   double error(0);
   for (int i = 0; i < samples.size(); ++i) {
-    if (samples[i].data_.is_right_) {
-      if (samples[i].data_.features_[stump.feature_] < stump.threshold_) {
+    if (samples[i].data_.features_[stump.feature_] < stump.threshold_) {
+      if (samples[i].data_.is_right_) {
         std::get<0>(res) += 1;
       } else {
         std::get<1>(res) += 1;
         error += samples[i].weight_;
       }
     } else {
-      if (samples[i].data_.features_[stump.feature_] < stump.threshold_) {
+      if (samples[i].data_.is_right_) {
         std::get<2>(res) += 1;
         error += samples[i].weight_;
       } else {
@@ -790,9 +943,20 @@ using namespace face_assessment;
 using namespace std;
 using namespace cv;
 int main() {
-  // ObtainData("../../resources/data3.yaml", "../../resources/best_img.txt",
+  // ObtainData("../../resources/dataset/right_3",
+  //           "../../resources/dataset/wrong_3", "../../resources/data3.yaml",
   //           50);  // 200%n_zones==0 must be true
-  TeachAdaBoost("../../resources/data.yaml", "../../resources/adaboost2.yaml",
-                0.75, 100);
+  // cout << "obtained" << '\n';
+
+  //TeachAdaBoost("../../resources/data3.yaml", "../../resources/adaboost4.yaml",
+  //              "../../resources/unused4.yaml", 0.75, 100);
+  //std::cout << "tought\n";
+  std::vector<Sample> unused;
+  std::vector<Stump> stumps;
+  ReadSamples("../../resources/unused.yaml", unused);
+  ReadStumps("../../resources/adaboost3.yaml", stumps);
+  std::cout << "read\n";
+  AssignByAdaBoost(unused, stumps);
+
   return 0;
 }
