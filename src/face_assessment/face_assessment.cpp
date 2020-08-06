@@ -339,13 +339,15 @@ bool CutFace(cv::Mat& src, cv::Mat& dest, cv::CascadeClassifier& face_detector,
     faces[0].x += (faces[0].width - width);
     faces[0].width = width;
   }
+  AllignRect(faces[0]);
+  EnlargeRect(faces[0]);
   FitRect(faces[0], src);
   dest = cv::Mat(src, faces[0]).clone();
   resize(dest, dest, cv::Size(202, 202));
   return true;
 }
 
-void FitRect(cv::Rect& rect, cv::Mat& mat) {
+void AllignRect(cv::Rect& rect) {
   if (rect.width < 0) {
     rect.x += rect.width;
     rect.width = -rect.width;
@@ -354,30 +356,30 @@ void FitRect(cv::Rect& rect, cv::Mat& mat) {
     rect.y += rect.height;
     rect.height = -rect.height;
   }
-  if (rect.x + rect.width >= mat.cols) {
-    rect.width = mat.cols - 1 - rect.x;
+}
+void EnlargeRect(cv::Rect& rect) {
+  double up(0.3);
+  double down(0.2);
+  double sideways(0.2);
+  rect.y -= rect.height * up;
+  rect.height += rect.height * up + rect.height * down;
+  rect.x -= rect.width * sideways;
+  rect.width += 2 * rect.width * sideways;
+}
+void FitRect(cv::Rect& rect, cv::Mat& mat) {
+  cv::Point p1(rect.x, rect.y);
+  cv::Point p2(rect.x + rect.width, rect.y + rect.height);
+  std::vector<cv::Point> points{p1, p2};
+  for (int i = 0; i < points.size(); ++i) {
+    points[i].x = std::max(0, points[i].x);
+    points[i].x = std::min(mat.cols - 1, points[i].x);
+    points[i].y = std::max(0, points[i].y);
+    points[i].y = std::min(mat.rows - 1, points[i].y);
   }
-  if (rect.x + rect.width < 0) {
-    rect.width = -rect.x;
-  }
-  if (rect.y + rect.height >= mat.rows) {
-    rect.height = mat.rows - 1 - rect.y;
-  }
-  if (rect.y + rect.height < 0) {
-    rect.height = -rect.y;
-  }
-  if (rect.x < 0) {
-    rect.x = 0;
-  }
-  if (rect.y < 0) {
-    rect.y = 0;
-  }
-  if (rect.x >= mat.cols) {
-    rect.x = mat.cols - 1;
-  }
-  if (rect.y >= mat.rows) {
-    rect.y = mat.rows - 1;
-  }
+  rect.x = points[0].x;
+  rect.y = points[0].y;
+  rect.width = points[1].x - points[0].x;
+  rect.height = points[1].y - points[0].y;
 }
 void FindEyes(cv::Mat& src, std::vector<cv::Rect>& eyes,
               cv::CascadeClassifier eye_detector) {
@@ -497,28 +499,71 @@ bool ObtainData(std::string right_path, std::string wrong_path,
   using namespace face_assessment;
   using namespace std;
   using namespace cv;
-  CascadeClassifier face_detector;
-  face_detector.load("../../resources/haarcascade_frontalface_default.xml");
-  CascadeClassifier eye_detector_l;
-  eye_detector_l.load("../../resources/haarcascade_lefteye_2splits.xml");
-  CascadeClassifier eye_detector_r;
-  eye_detector_r.load("../../resources/haarcascade_righteye_2splits.xml");
+  // CascadeClassifier face_detector;
+  // face_detector.load("../../resources/haarcascade_frontalface_default.xml");
+  // CascadeClassifier eye_detector_l;
+  // eye_detector_l.load("../../resources/haarcascade_lefteye_2splits.xml");
+  // CascadeClassifier eye_detector_r;
+  // eye_detector_r.load("../../resources/haarcascade_righteye_2splits.xml");
   cv::FileStorage output(output_path, cv::FileStorage::WRITE);
   output << "samples"
          << "[";
-  AddData(right_path, true, output, face_detector, eye_detector_l,
-          eye_detector_r, n_zones);
-  AddData(wrong_path, false, output, face_detector, eye_detector_l,
-          eye_detector_r, n_zones);
+  // AddDataFromUncut(right_path, true, output, face_detector, eye_detector_l,
+  //                 eye_detector_r, n_zones);
+  // AddDataFromUncut(wrong_path, false, output, face_detector, eye_detector_l,
+  //                 eye_detector_r, n_zones);
+  AddDataFromCut(right_path, true, output, n_zones);
+  AddDataFromCut(wrong_path, false, output, n_zones);
   output << "]";
   output.release();
   cvDestroyAllWindows();
   return true;
 }
-void AddData(std::string image_path, bool is_right, cv::FileStorage& output,
-             cv::CascadeClassifier& face_detector,
-             cv::CascadeClassifier& eye_detector_l,
-             cv::CascadeClassifier& eye_detector_r, int n_zones) {
+void CutImages(const std::vector<std::string>& paths) {
+  cv::CascadeClassifier face_detector;
+  face_detector.load("../../resources/haarcascade_frontalface_default.xml");
+  cv::CascadeClassifier eye_detector_l;
+  eye_detector_l.load("../../resources/haarcascade_lefteye_2splits.xml");
+  cv::CascadeClassifier eye_detector_r;
+  eye_detector_r.load("../../resources/haarcascade_righteye_2splits.xml");
+  for (int i = 0; i < paths.size(); ++i) {
+    for (auto entry : std::filesystem::directory_iterator(paths[i])) {
+      cv::Mat image = imread(entry.path().string(), cv::IMREAD_COLOR);
+      if (image.empty()) {
+        std::cout << "image not loaded\n";
+        return;
+      }
+      std::vector<cv::Rect> eyes_r, eyes_l;
+      FindEyes(image, eyes_r, eye_detector_r);
+      FindEyes(image, eyes_l, eye_detector_l);
+      std::vector<cv::Rect> eyes(eyes_r);
+      eyes.insert(eyes.end(), eyes_l.begin(), eyes_l.end());
+      SelectTwoEyes(eyes);
+      if (eyes.size() == 2) {
+        std::vector<double> central_line(SplitFace(image, eyes));
+        if (!Allign(image, central_line)) {
+          continue;
+        }
+        imshow("image_center", image);
+        cv::Mat cut_img;
+        if (!CutFace(image, cut_img, face_detector, central_line)) {
+          continue;
+        }
+        imshow("cut_img", cut_img);
+        std::string res_name(
+            paths[i] + "_cut/" +
+            entry.path().filename().replace_extension(".png").string());
+        std::cout << res_name << '\n';
+        cv::imwrite(res_name, cut_img);
+      }
+    }
+  }
+}
+void AddDataFromUncut(std::string image_path, bool is_right,
+                      cv::FileStorage& output,
+                      cv::CascadeClassifier& face_detector,
+                      cv::CascadeClassifier& eye_detector_l,
+                      cv::CascadeClassifier& eye_detector_r, int n_zones) {
   using namespace std;
   using namespace cv;
   auto dir_it(
@@ -530,15 +575,6 @@ void AddData(std::string image_path, bool is_right, cv::FileStorage& output,
     Sample row;
     row.is_right_ = is_right;
     row.name_ = dir_it->path().filename().string();
-    // std::regex rx("58_");
-    // if (!regex_search(row.name_.begin(), row.name_.end(), rx)) {
-    //  ++dir_it;
-    //  continue;
-    //} else {
-    //  int a = 3;
-    //}
-    // imshow("image", image);
-
     vector<Rect> eyes_r, eyes_l;
     FindEyes(image, eyes_r, eye_detector_r);
     FindEyes(image, eyes_l, eye_detector_l);
@@ -552,13 +588,13 @@ void AddData(std::string image_path, bool is_right, cv::FileStorage& output,
         ++dir_it;
         continue;
       }
-      // imshow("image_center", image);
+      imshow("image_center", image);
       Mat cut_img;
       if (!CutFace(image, cut_img, face_detector, central_line)) {
         ++dir_it;
         continue;
       }
-      // imshow("cut_img", cut_img);
+      imshow("cut_img", cut_img);
 
       Mat LBP_img;
       OLBP_<char>(cut_img, LBP_img);
@@ -568,6 +604,31 @@ void AddData(std::string image_path, bool is_right, cv::FileStorage& output,
       output << row;
       // cv::waitKey();
     }
+    std::cout << dir_it->path().filename().string() << '\n';
+  }
+}
+
+void AddDataFromCut(std::string image_path, bool is_right,
+                    cv::FileStorage& output, int n_zones) {
+  using namespace std;
+  using namespace cv;
+  auto dir_it(
+      std::filesystem::begin(std::filesystem::directory_iterator(image_path)));
+  auto dir_end(
+      std::filesystem::end(std::filesystem::directory_iterator(image_path)));
+  for (; dir_it != dir_end; ++dir_it) {
+    Mat image = imread(dir_it->path().string(), IMREAD_GRAYSCALE);
+    Sample row;
+    row.is_right_ = is_right;
+    row.name_ = dir_it->path().filename().string();
+
+    Mat LBP_img;
+    OLBP_<char>(image, LBP_img);
+
+    // imshow("OLBP image", LBP_img);
+    RetrieveFeatures(LBP_img, row.features_, n_zones);
+    output << row;
+    // cv::waitKey();
     std::cout << dir_it->path().filename().string() << '\n';
   }
 }
@@ -658,7 +719,7 @@ void TeachAdaBoost(std::string input, std::string output,
     stumps[i] = GetBestStump(samples);
     UpdateDataset(samples, stumps[i]);
     if (i % 20 == 0) {
-      RemoveNoize(samples,0.01);
+      RemoveNoize(samples, 0.01);
     }
     fs << "stumps" << stumps;
     fs.release();
@@ -670,16 +731,16 @@ void RemoveNoize(std::vector<DataRow>& samples, double median_eps) {
             [&](const DataRow& a, const DataRow& b) {
               return a.weight_ < b.weight_;
             });
-  double median = samples[samples.size()/2].weight_;
+  double median = samples[samples.size() / 2].weight_;
   std::vector<DataRow> res;
-  for(int i = 0;i<samples.size();++i){
-    if(samples[i].weight_-median<median_eps){
+  for (int i = 0; i < samples.size(); ++i) {
+    if (samples[i].weight_ - median < median_eps) {
       res.push_back(samples[i]);
     }
   }
-  samples =res;
-  for(int i = 0;i<samples.size();++i){
-    samples[i].weight_/=samples.size();
+  samples = res;
+  for (int i = 0; i < samples.size(); ++i) {
+    samples[i].weight_ /= samples.size();
   }
 }
 void NormalizeDataset(std::vector<DataRow>& samples) {
@@ -943,18 +1004,31 @@ using namespace face_assessment;
 using namespace std;
 using namespace cv;
 int main() {
-  // ObtainData("../../resources/dataset/right_3",
-  //           "../../resources/dataset/wrong_3", "../../resources/data3.yaml",
-  //           50);  // 200%n_zones==0 must be true
-  // cout << "obtained" << '\n';
+  // std::vector<std::string> paths;
+  // for (auto x :
+  //     std::filesystem::directory_iterator("../../resources/dataset/")) {
+  //  if (x.is_directory()) {
+  //    paths.push_back(x.path().string());
+  //  }
+  //}
+  //// for (int i = 0; i < paths.size(); ++i) {
+  ////  std::filesystem::create_directory(paths[i]+ "_cut");
+  ////}
+  // CutImages(paths);
+  ObtainData("../../resources/dataset/cut/right_4_cut",
+             "../../resources/dataset/cut/wrong_4_cut",
+             "../../resources/data_cut.yaml",
+             50);  // 200%n_zones==0 must be true
+  cout << "obtained" << '\n';
 
-  //TeachAdaBoost("../../resources/data3.yaml", "../../resources/adaboost4.yaml",
-  //              "../../resources/unused4.yaml", 0.75, 100);
-  //std::cout << "tought\n";
+  TeachAdaBoost("../../resources/data_cut.yaml",
+                "../../resources/adaboost_cut.yaml",
+                "../../resources/unused_cut.yaml", 0.75, 100);
+  std::cout << "tought\n";
   std::vector<Sample> unused;
   std::vector<Stump> stumps;
-  ReadSamples("../../resources/unused.yaml", unused);
-  ReadStumps("../../resources/adaboost3.yaml", stumps);
+  ReadSamples("../../resources/unused_cut.yaml", unused);
+  ReadStumps("../../resources/adaboost_cut.yaml", stumps);
   std::cout << "read\n";
   AssignByAdaBoost(unused, stumps);
 

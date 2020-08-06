@@ -86,6 +86,8 @@ void ELBP_(const cv::Mat& src, cv::Mat& dst, int radius, int neighbors);
 
 bool CutFace(cv::Mat& src, cv::Mat& dest, cv::CascadeClassifier& face_detector,
              const std::vector<double>& center_line);
+void AllignRect(cv::Rect& rect);
+void EnlargeRect(cv::Rect& rect);
 void FitRect(cv::Rect& rect, cv::Mat& mat);
 std::vector<double> SplitFace(cv::Mat& src, const std::vector<cv::Rect>& eyes);
 std::vector<double> CenterLine(cv::Point2d a, cv::Point2d b);
@@ -97,10 +99,14 @@ void RetrieveFeatures(cv::Mat& img, std::vector<double>& features, int n_zones);
 // in current implementation 200%n_zones==0 must be true
 bool ObtainData(std::string right_path, std::string wrong_path,
                 std::string output_path, int n_zones);
-void AddData(std::string image_path, bool is_right, cv::FileStorage& output,
-             cv::CascadeClassifier& face_detector,
-             cv::CascadeClassifier& eye_detector_l,
-             cv::CascadeClassifier& eye_detector_r, int n_zones);
+void AddDataFromUncut(std::string image_path, bool is_right,
+                      cv::FileStorage& output,
+                      cv::CascadeClassifier& face_detector,
+                      cv::CascadeClassifier& eye_detector_l,
+                      cv::CascadeClassifier& eye_detector_r, int n_zones);
+void AddDataFromCut(std::string image_path, bool is_right,
+                    cv::FileStorage& output, int n_zones);
+void CutImages(const std::vector<std::string>& paths);
 
 struct Stump {
   Stump();
@@ -138,7 +144,7 @@ double GiniImpurity(std::tuple<int, int, int, int> occurances);
 double GiniImpurity(double p1, double p2);
 Stump GetBestStump(std::vector<DataRow>& samples);
 void UpdateDataset(std::vector<DataRow>& samples, Stump stump);
-void RemoveNoize(std::vector<DataRow>& samples,double median_eps);
+void RemoveNoize(std::vector<DataRow>& samples, double median_eps);
 void PickData(std::vector<DataRow>& samples);
 double IncreasedWeight(double weight, double stump_weight);
 double DecreasedWeight(double weight, double stump_weight);
