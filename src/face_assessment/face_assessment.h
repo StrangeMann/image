@@ -80,7 +80,7 @@ struct DataRow {
 };
 
 template <typename _Tp>
-void OLBP_(const cv::Mat& src, cv::Mat& dst);
+void OLBP(const cv::Mat& src, cv::Mat& dst);
 template <typename _Tp>
 void ELBP_(const cv::Mat& src, cv::Mat& dst, int radius, int neighbors);
 
@@ -95,17 +95,16 @@ void FindEyes(cv::Mat& src, std::vector<cv::Rect>& eyes,
               cv::CascadeClassifier eye_detector);
 void SelectTwoEyes(std::vector<cv::Rect>& eyes);
 bool Allign(cv::Mat& img, const std::vector<double>& central_line);
-void RetrieveFeatures(cv::Mat& img, std::vector<double>& features, int n_zones);
-// in current implementation 200%n_zones==0 must be true
+void RetrieveFeatures(cv::Mat& img, std::vector<double>& features, int min_zone_size);
 bool ObtainData(std::string right_path, std::string wrong_path,
-                std::string output_path, int n_zones);
+                std::string output_path, int min_zone_size);
 void AddDataFromUncut(std::string image_path, bool is_right,
                       cv::FileStorage& output,
                       cv::CascadeClassifier& face_detector,
                       cv::CascadeClassifier& eye_detector_l,
-                      cv::CascadeClassifier& eye_detector_r, int n_zones);
+                      cv::CascadeClassifier& eye_detector_r, int min_zone_size);
 void AddDataFromCut(std::string image_path, bool is_right,
-                    cv::FileStorage& output, int n_zones);
+                    cv::FileStorage& output, int min_zone_size);
 void CutImages(const std::vector<std::string>& paths);
 
 struct Stump {

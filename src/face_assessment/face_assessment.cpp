@@ -249,52 +249,8 @@ const double PI = 3.14158;
 //    DisplayImage();
 //  }
 //}
-// why does this not work with neighbors<16
 template <typename _Tp>
-void ELBP_(const cv::Mat& src, cv::Mat& dst, int radius, int neighbors) {
-  neighbors = max(min(neighbors, 31), 1);
-  dst = Mat::zeros(src.rows - 2 * radius, src.cols - 2 * radius, CV_32SC1);
-  for (int n = 0; n < neighbors; n++) {
-    // sample points
-    float x = static_cast<float>(radius) *
-              cos(2.0 * PI * n / static_cast<float>(neighbors));
-    float y = static_cast<float>(radius) *
-              -sin(2.0 * PI * n / static_cast<float>(neighbors));
-    // relative indices
-    int fx = static_cast<int>(floor(x));
-    int fy = static_cast<int>(floor(y));
-    int cx = static_cast<int>(ceil(x));
-    int cy = static_cast<int>(ceil(y));
-    // fractional part
-    float ty = y - fy;
-    float tx = x - fx;
-    // set interpolation weights
-    float w1 = (1 - tx) * (1 - ty);
-    float w2 = tx * (1 - ty);
-    float w3 = (1 - tx) * ty;
-    float w4 = tx * ty;
-    // iterate through your data
-    for (int i = radius; i < src.rows - radius; i++) {
-      for (int j = radius; j < src.cols - radius; j++) {
-        float t = w1 * src.at<_Tp>(i + fy, j + fx) +
-                  w2 * src.at<_Tp>(i + fy, j + cx) +
-                  w3 * src.at<_Tp>(i + cy, j + fx) +
-                  w4 * src.at<_Tp>(i + cy, j + cx);
-        // we are dealing with floating point precision, so add some little
-        // tolerance
-        dst.at<int>(i - radius, j - radius) +=
-            ((t > src.at<_Tp>(i, j)) && (abs(t - src.at<_Tp>(i, j)) >
-                                         std::numeric_limits<float>::epsilon()))
-            << n;
-        if (n == neighbors - 1) {
-          // std::cout << dst.at<int>(i - radius, j - radius) << '\n';
-        }
-      }
-    }
-  }
-}
-template <typename _Tp>
-void OLBP_(const cv::Mat& src, cv::Mat& dst) {
+void OLBP(const cv::Mat& src, cv::Mat& dst) {
   dst = cv::Mat::zeros(src.rows - 2, src.cols - 2, CV_8UC1);
   for (int i = 1; i < src.rows - 1; i++) {
     for (int j = 1; j < src.cols - 1; j++) {
@@ -358,9 +314,9 @@ void AllignRect(cv::Rect& rect) {
   }
 }
 void EnlargeRect(cv::Rect& rect) {
-  double up(0.3);
-  double down(0.2);
-  double sideways(0.2);
+  double up(0.5);
+  double down(0.3);
+  double sideways(0.4);
   rect.y -= rect.height * up;
   rect.height += rect.height * up + rect.height * down;
   rect.x -= rect.width * sideways;
@@ -458,44 +414,52 @@ bool Allign(cv::Mat& img, const std::vector<double>& central_line) {
 }
 // img should be square
 void RetrieveFeatures(cv::Mat& img, std::vector<double>& features,
-                      int n_zones) {
+                      int min_zone_size) {
+  if (img.cols != img.rows) {
+    std::cout << "img should be square\n";
+    return;
+  }
   features.clear();
-  // int n_zones(10);  // must img.rows%segments == 0
   cv::Mat mask_l(img.rows, img.cols, CV_8UC1, cv::Scalar(0));
   cv::Mat mask_r(img.rows, img.cols, CV_8UC1, cv::Scalar(0));
-  for (int y = 0; y < n_zones; ++y) {
-    for (int x = 0; x < n_zones / 2; ++x) {
-      cv::Point l_p1(x * (img.cols / n_zones), y * (img.rows / n_zones));
-      cv::Point l_p2(l_p1.x + (img.cols / n_zones),
-                     l_p1.y + (img.rows / n_zones));
-      cv::Point r_p1(img.cols - l_p1.x, y * (img.rows / n_zones));
-      cv::Point r_p2(img.cols - l_p2.x, l_p1.y + (img.rows / n_zones));
-      rectangle(mask_l, l_p1, l_p2, cv::Scalar(255), cv::LineTypes::FILLED);
-      rectangle(mask_r, r_p1, r_p2, cv::Scalar(255), cv::LineTypes::FILLED);
+  for (int n = min_zone_size; n < img.cols; ++n) {
+    if (img.cols % n == 0 && n % 2 == 0) {
+      for (int y = 0; y < n; ++y) {
+        for (int x = 0; x < n / 2; ++x) {
+          cv::Point l_p1(x * (img.cols / n), y * (img.rows / n));
+          cv::Point l_p2(l_p1.x + (img.cols / n), l_p1.y + (img.rows / n));
+          cv::Point r_p1(img.cols - l_p1.x, y * (img.rows / n));
+          cv::Point r_p2(img.cols - l_p2.x, l_p1.y + (img.rows / n));
+          rectangle(mask_l, l_p1, l_p2, cv::Scalar(255), cv::LineTypes::FILLED);
+          rectangle(mask_r, r_p1, r_p2, cv::Scalar(255), cv::LineTypes::FILLED);
 
-      // imshow("mask_l", mask_l);
-      // imshow("mask_r", mask_r);
-      // cv::waitKey();
+          //std::cout << l_p1 << ' ' << l_p2 << ' ' << r_p1 << ' ' << l_p2
+          //          << '\n';
+          //imshow("mask_l", mask_l);
+          //imshow("mask_r", mask_r);
+          //cv::waitKey();
 
-      cv::Mat hist_l, hist_r;
-      std::vector<cv::Mat> img_wrapper{img};
-      std::vector<int> channels{0};
-      std::vector<int> histSize{256};
-      std::vector<float> ranges{0, 256};
+          cv::Mat hist_l, hist_r;
+          std::vector<cv::Mat> img_wrapper{img};
+          std::vector<int> channels{0};
+          std::vector<int> histSize{256};
+          std::vector<float> ranges{0, 256};
 
-      cv::calcHist(img_wrapper, channels, mask_l, hist_l, histSize, ranges);
-      cv::calcHist(img_wrapper, channels, mask_r, hist_r, histSize, ranges);
-      double metric = cv::compareHist(hist_l, hist_r,
-                                      cv::HistCompMethods::HISTCMP_CHISQR_ALT);
-      features.push_back(metric);
+          cv::calcHist(img_wrapper, channels, mask_l, hist_l, histSize, ranges);
+          cv::calcHist(img_wrapper, channels, mask_r, hist_r, histSize, ranges);
+          double metric = cv::compareHist(
+              hist_l, hist_r, cv::HistCompMethods::HISTCMP_CHISQR_ALT);
+          features.push_back(metric);
 
-      rectangle(mask_l, l_p1, l_p2, cv::Scalar(0), cv::LineTypes::FILLED);
-      rectangle(mask_r, r_p1, r_p2, cv::Scalar(0), cv::LineTypes::FILLED);
+          rectangle(mask_l, l_p1, l_p2, cv::Scalar(0), cv::LineTypes::FILLED);
+          rectangle(mask_r, r_p1, r_p2, cv::Scalar(0), cv::LineTypes::FILLED);
+        }
+      }
     }
   }
 }
 bool ObtainData(std::string right_path, std::string wrong_path,
-                std::string output_path, int n_zones) {
+                std::string output_path, int min_zone_size) {
   using namespace face_assessment;
   using namespace std;
   using namespace cv;
@@ -512,8 +476,8 @@ bool ObtainData(std::string right_path, std::string wrong_path,
   //                 eye_detector_r, n_zones);
   // AddDataFromUncut(wrong_path, false, output, face_detector, eye_detector_l,
   //                 eye_detector_r, n_zones);
-  AddDataFromCut(right_path, true, output, n_zones);
-  AddDataFromCut(wrong_path, false, output, n_zones);
+  AddDataFromCut(right_path, true, output, min_zone_size);
+  AddDataFromCut(wrong_path, false, output, min_zone_size);
   output << "]";
   output.release();
   cvDestroyAllWindows();
@@ -563,7 +527,8 @@ void AddDataFromUncut(std::string image_path, bool is_right,
                       cv::FileStorage& output,
                       cv::CascadeClassifier& face_detector,
                       cv::CascadeClassifier& eye_detector_l,
-                      cv::CascadeClassifier& eye_detector_r, int n_zones) {
+                      cv::CascadeClassifier& eye_detector_r,
+                      int min_zone_size) {
   using namespace std;
   using namespace cv;
   auto dir_it(
@@ -597,10 +562,10 @@ void AddDataFromUncut(std::string image_path, bool is_right,
       imshow("cut_img", cut_img);
 
       Mat LBP_img;
-      OLBP_<char>(cut_img, LBP_img);
+      OLBP<char>(cut_img, LBP_img);
 
       // imshow("OLBP image", LBP_img);
-      RetrieveFeatures(LBP_img, row.features_, n_zones);
+      RetrieveFeatures(LBP_img, row.features_, min_zone_size);
       output << row;
       // cv::waitKey();
     }
@@ -609,7 +574,7 @@ void AddDataFromUncut(std::string image_path, bool is_right,
 }
 
 void AddDataFromCut(std::string image_path, bool is_right,
-                    cv::FileStorage& output, int n_zones) {
+                    cv::FileStorage& output, int min_zone_size) {
   using namespace std;
   using namespace cv;
   auto dir_it(
@@ -618,15 +583,16 @@ void AddDataFromCut(std::string image_path, bool is_right,
       std::filesystem::end(std::filesystem::directory_iterator(image_path)));
   for (; dir_it != dir_end; ++dir_it) {
     Mat image = imread(dir_it->path().string(), IMREAD_GRAYSCALE);
+    // imshow("image", image);
     Sample row;
     row.is_right_ = is_right;
     row.name_ = dir_it->path().filename().string();
 
     Mat LBP_img;
-    OLBP_<char>(image, LBP_img);
+    OLBP<char>(image, LBP_img);
 
-    // imshow("OLBP image", LBP_img);
-    RetrieveFeatures(LBP_img, row.features_, n_zones);
+    // imshow("LBP image", LBP_img);
+    RetrieveFeatures(LBP_img, row.features_, min_zone_size);
     output << row;
     // cv::waitKey();
     std::cout << dir_it->path().filename().string() << '\n';
@@ -673,9 +639,6 @@ void Stump::SetWeight(double error) {
   weight_ = 0.5 * log((1.0 - error) / error);
 }
 bool Stump::Classify(const Sample& sample) {
-  if (feature_ < 0 || feature_ >= sample.features_.size()) {
-    int b = 3;
-  }
   if (sample.features_[feature_] < threshold_) {
     return true;
   }
@@ -1006,29 +969,48 @@ using namespace cv;
 int main() {
   // std::vector<std::string> paths;
   // for (auto x :
-  //     std::filesystem::directory_iterator("../../resources/dataset/")) {
+  //     std::filesystem::directory_iterator("../../resources/dataset/cut")) {
   //  if (x.is_directory()) {
   //    paths.push_back(x.path().string());
   //  }
   //}
   //// for (int i = 0; i < paths.size(); ++i) {
-  ////  std::filesystem::create_directory(paths[i]+ "_cut");
+  ////  std::filesystem::create_directory(paths[i] + "_cut");
   ////}
-  // CutImages(paths);
-  ObtainData("../../resources/dataset/cut/right_4_cut",
-             "../../resources/dataset/cut/wrong_4_cut",
-             "../../resources/data_cut.yaml",
-             50);  // 200%n_zones==0 must be true
+  //// CutImages(paths);
+
+  // for (auto path : paths) {
+  //  std::vector<std::string> imgs;
+  //  for (auto x : std::filesystem::directory_iterator(path)) {
+  //    if (!x.is_directory()) {
+  //      imgs.push_back(x.path().string());
+  //    }
+  //  }
+  //  int n_zero(4);
+  //  for (int i = 0; i < imgs.size(); ++i) {
+  //    std::string name(to_string(i));
+  //    name =
+  //        path + "/" + std::string(n_zero - name.length(), '0') + name +
+  //        ".png";
+  //    std::cout << imgs[i] << '\n' << name << '\n';
+  //    rename(imgs[i].c_str(), name.c_str());
+  //  }
+  //}
+
+  std::string right("../../resources/dataset/cut/right_4_cut");
+  std::string wrong("../../resources/dataset/cut/wrong_3_cut");
+  std::string data("../../resources/data_cut_2.yaml");
+  ObtainData(right, wrong, data, 2);
   cout << "obtained" << '\n';
 
-  TeachAdaBoost("../../resources/data_cut.yaml",
-                "../../resources/adaboost_cut.yaml",
-                "../../resources/unused_cut.yaml", 0.75, 100);
+  std::string adaboost_path("../../resources/adaboost_cut_2.yaml");
+  std::string unused_path("../../resources/unused_cut_2.yaml");
+  TeachAdaBoost(data, adaboost_path, unused_path, 0.75, 100);
   std::cout << "tought\n";
   std::vector<Sample> unused;
   std::vector<Stump> stumps;
-  ReadSamples("../../resources/unused_cut.yaml", unused);
-  ReadStumps("../../resources/adaboost_cut.yaml", stumps);
+  ReadSamples(unused_path, unused);
+  ReadStumps(adaboost_path, stumps);
   std::cout << "read\n";
   AssignByAdaBoost(unused, stumps);
 
