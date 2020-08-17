@@ -95,7 +95,8 @@ void FindEyes(cv::Mat& src, std::vector<cv::Rect>& eyes,
               cv::CascadeClassifier eye_detector);
 void SelectTwoEyes(std::vector<cv::Rect>& eyes);
 bool Allign(cv::Mat& img, const std::vector<double>& central_line);
-void RetrieveFeatures(cv::Mat& img, std::vector<double>& features, int min_zone_size);
+void RetrieveFeatures(cv::Mat& img, std::vector<double>& features,
+                      int min_zone_size);
 bool ObtainData(std::string right_path, std::string wrong_path,
                 std::string output_path, int min_zone_size);
 void AddDataFromUncut(std::string image_path, bool is_right,
@@ -151,6 +152,11 @@ double DecreasedWeight(double weight, double stump_weight);
 void ReadSamples(std::string data_path, std::vector<Sample>& output);
 void ReadStumps(std::string data_path, std::vector<Stump>& output);
 void AssignByAdaBoost(std::vector<Sample>& data, std::vector<Stump>& stumps);
+
+void DistortImages(std::vector<Sample>& image_list, std::string images_path,
+                   std::string output_right_path,
+                   std::string output_wrong_path);
+void BrightnessDistortImage(cv::Mat& image);
 }  // namespace face_assessment
 
 #endif

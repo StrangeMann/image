@@ -433,11 +433,11 @@ void RetrieveFeatures(cv::Mat& img, std::vector<double>& features,
           rectangle(mask_l, l_p1, l_p2, cv::Scalar(255), cv::LineTypes::FILLED);
           rectangle(mask_r, r_p1, r_p2, cv::Scalar(255), cv::LineTypes::FILLED);
 
-          //std::cout << l_p1 << ' ' << l_p2 << ' ' << r_p1 << ' ' << l_p2
+          // std::cout << l_p1 << ' ' << l_p2 << ' ' << r_p1 << ' ' << l_p2
           //          << '\n';
-          //imshow("mask_l", mask_l);
-          //imshow("mask_r", mask_r);
-          //cv::waitKey();
+          // imshow("mask_l", mask_l);
+          // imshow("mask_r", mask_r);
+          // cv::waitKey();
 
           cv::Mat hist_l, hist_r;
           std::vector<cv::Mat> img_wrapper{img};
@@ -460,7 +460,6 @@ void RetrieveFeatures(cv::Mat& img, std::vector<double>& features,
 }
 bool ObtainData(std::string right_path, std::string wrong_path,
                 std::string output_path, int min_zone_size) {
-  using namespace face_assessment;
   using namespace std;
   using namespace cv;
   // CascadeClassifier face_detector;
@@ -961,6 +960,35 @@ double GiniImpurity(std::tuple<int, int, int, int> occurances) {
   }
   return GiniImpurity(p1, p2) * w1 + GiniImpurity(p3, p4) * w2;
 }
+
+void DistortImages(std::vector<Sample>& image_list, std::string images_path,
+                   std::string output_right_path,
+                   std::string output_wrong_path) {
+  for (auto sample : image_list) {
+    cv::Mat im = imread(images_path + '/' + sample.name_, cv::IMREAD_COLOR);
+    BrightnessDistortImage(im);
+    std::string output_path;
+    if (sample.is_right_) {
+      output_path = output_right_path;
+    } else {
+      output_path = output_wrong_path;
+    }
+    imwrite(output_path + '/' + sample.name_, im);
+  }
+}
+
+void BrightnessDistortImage(cv::Mat& image) {
+  double b_k = 0.6;
+  double g_k = 1;
+  double r_k = 0.8;
+  for (int y = 0; y < image.rows; ++y) {
+    for (int x = 0; x < image.cols; ++x) {
+      image.at<cv::Vec3b>(y, x)[0] *= b_k;
+      image.at<cv::Vec3b>(y, x)[1] *= g_k;
+      image.at<cv::Vec3b>(y, x)[2] *= r_k;
+    }
+  }
+}
 }  // namespace face_assessment
 
 using namespace face_assessment;
@@ -974,11 +1002,12 @@ int main() {
   //    paths.push_back(x.path().string());
   //  }
   //}
-  //// for (int i = 0; i < paths.size(); ++i) {
-  ////  std::filesystem::create_directory(paths[i] + "_cut");
-  ////}
-  //// CutImages(paths);
+  ////// for (int i = 0; i < paths.size(); ++i) {
+  //////  std::filesystem::create_directory(paths[i] + "_cut");
+  //////}
+  ////// CutImages(paths);
 
+  // int n(0);
   // for (auto path : paths) {
   //  std::vector<std::string> imgs;
   //  for (auto x : std::filesystem::directory_iterator(path)) {
@@ -988,7 +1017,8 @@ int main() {
   //  }
   //  int n_zero(4);
   //  for (int i = 0; i < imgs.size(); ++i) {
-  //    std::string name(to_string(i));
+  //    ++n;
+  //    std::string name(to_string(n));
   //    name =
   //        path + "/" + std::string(n_zero - name.length(), '0') + name +
   //        ".png";
@@ -1000,19 +1030,35 @@ int main() {
   std::string right("../../resources/dataset/cut/right_4_cut");
   std::string wrong("../../resources/dataset/cut/wrong_3_cut");
   std::string data("../../resources/data_cut_2.yaml");
-  ObtainData(right, wrong, data, 2);
-  cout << "obtained" << '\n';
-
   std::string adaboost_path("../../resources/adaboost_cut_2.yaml");
   std::string unused_path("../../resources/unused_cut_2.yaml");
-  TeachAdaBoost(data, adaboost_path, unused_path, 0.75, 100);
-  std::cout << "tought\n";
+  std::string all_path("../../resources/dataset/cut/all");
+  std::string distorted_right_path(
+      "../../resources/dataset/cut/distorted_right");
+  std::string distorted_wrong_path(
+      "../../resources/dataset/cut/distorted_wrong");
+  std::string distorted_data_path("../../resources/data_distorted.yaml");
+  int min_zone(2);
+
+  //// ObtainData(right, wrong, data, min_zone);
+  //// cout << "obtained" << '\n';
+
+  //// TeachAdaBoost(data, adaboost_path, unused_path, 0.75, 100);
+  //// std::cout << "tought\n";
+
   std::vector<Sample> unused;
-  std::vector<Stump> stumps;
   ReadSamples(unused_path, unused);
+  std::vector<Stump> stumps;
   ReadStumps(adaboost_path, stumps);
   std::cout << "read\n";
   AssignByAdaBoost(unused, stumps);
+
+  DistortImages(unused, all_path, distorted_right_path, distorted_wrong_path);
+  ObtainData(distorted_right_path, distorted_wrong_path, distorted_data_path,
+             min_zone);
+  std::vector<Sample> distorted;
+  ReadSamples(distorted_data_path,distorted);
+  AssignByAdaBoost(distorted,stumps);
 
   return 0;
 }
