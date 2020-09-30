@@ -18,237 +18,6 @@ namespace face_assessment {
 
 const double PI = 3.14158;
 
-// std::istream& CSVRow::readNextRow(std::istream& str) {
-//  row_.clear();
-//
-//  std::string line;
-//  std::getline(str, line);
-//  std::stringstream lineStream(line);
-//  std::string cell;
-//  while (std::getline(lineStream, cell, ',')) {
-//    row_.push_back(cell);
-//  }
-//  return str;
-//}
-//
-// ImageProcessor::ImageProcessor(std::ifstream& points_symmetry) {
-//  std::string line;
-//  std::getline(points_symmetry, line);
-//  std::stringstream lineStream(line);
-//  int point;
-//  while (lineStream >> point) {
-//    right_points_.push_back(point);
-//  }
-//  std::getline(points_symmetry, line);
-//  lineStream = std::stringstream(line);
-//  for (int i = 0; i < right_points_.size(); ++i) {
-//    lineStream >> point;
-//    left_points_.push_back(point);
-//    if (left_points_[i] == right_points_[i]) {
-//      central_points_.push_back(left_points_[i]);
-//    }
-//  }
-//  l_ranges_.resize(left_points_.size(),
-//                   std::vector<double>(left_points_.size()));
-//  r_ranges_.resize(left_points_.size(),
-//                   std::vector<double>(left_points_.size()));
-//}
-// void ImageProcessor::DisplayImage() {
-//  cv::imshow("Display window", img_);
-//  int k = cv::waitKey(0);  // Wait for a keystroke in the window
-//}
-// bool ImageProcessor::Fill(const std::vector<std::string>& row,
-//                          std::string img_folder) {
-//  name_ = row.front();
-//  std::regex re("^.....[a]");
-//  if (regex_search(row.front().begin(), row.front().end(), re)) {
-//    coordinates_.clear();
-//    for (int i = 3; i < row.size(); i += 2) {
-//      double x, y;
-//      std::stringstream ss(row[i - 1]);
-//      ss >> x;
-//      ss = std::stringstream(row[i]);
-//      ss << row[i];
-//      ss >> y;
-//      coordinates_.push_back(cv::Point2d(x, y));
-//    }
-//    CountRanges();
-//    img_folder += name_;
-//    img_folder += ".jpg";
-//    img_ = cv::imread(img_folder, cv::IMREAD_COLOR);
-//    if (img_.empty()) {
-//      std::cout << "Could not read the image: " << img_folder << std::endl;
-//    }
-//    return true;
-//  }
-//  return false;
-//}
-// double ImageProcessor::Range(cv::Point2d p1, cv::Point2d p2) {
-//  return cv::norm(p1 - p2);
-//}
-//
-// void ImageProcessor::CountRanges() {
-//  for (int i = 0; i < left_points_.size(); ++i) {
-//    cv::Point2d r_p1, l_p1;
-//    r_p1 = coordinates_[right_points_[i]];
-//    l_p1 = coordinates_[left_points_[i]];
-//    for (int j = i + 1; j < left_points_.size(); ++j) {
-//      cv::Point2d r_p2, l_p2;
-//      r_p2 = coordinates_[right_points_[j]];
-//      l_p2 = coordinates_[left_points_[j]];
-//      r_ranges_[i][j] = Range(r_p1, r_p2);
-//      l_ranges_[i][j] = Range(l_p1, l_p2);
-//    }
-//  }
-//}
-// void ImageProcessor::SetDiffToRatio() {
-//  range_diff_.clear();
-//  for (int i = 0; i < left_points_.size(); ++i) {
-//    for (int j = i + 1; j < left_points_.size(); ++j) {
-//      range_diff_.push_back(abs(r_ranges_[i][j] / l_ranges_[i][j]));
-//    }
-//  }
-//}
-// void ImageProcessor::SetDiffToSubstr() {
-//  range_diff_.clear();
-//  for (int i = 0; i < left_points_.size(); ++i) {
-//    for (int j = i + 1; j < left_points_.size(); ++j) {
-//      range_diff_.push_back(r_ranges_[i][j] - l_ranges_[i][j]);
-//    }
-//  }
-//}
-// double ImageProcessor::MinMaxMetric() {
-//  double max_diff = std::numeric_limits<decltype(max_diff)>::min();
-//  double min_diff = std::numeric_limits<decltype(min_diff)>::max();
-//  for (int i = 0; i < range_diff_.size(); ++i) {
-//    max_diff = std::max(max_diff, range_diff_[i]);
-//    min_diff = std::min(min_diff, range_diff_[i]);
-//  }
-//  return max_diff / min_diff;
-//}
-// double ImageProcessor::AvgMetric(int sapmling_frame, int repeats,
-//                                 double alpha) {
-//  std::random_device rd;
-//  std::mersenne_twister_engine<uint_fast32_t, 32, 624, 397, 31, 0x9908b0df,
-//  11,
-//                               0xffffffff, 7, 0x9d2c5680, 15, 0xefc60000, 18,
-//                               1812433253>
-//      generator(rd());
-//  std::uniform_int_distribution<int> distribution(0, range_diff_.size() - 1);
-//  std::vector<double> sums;
-//  for (int i = 0; i < repeats; ++i) {
-//    double sum = 0;
-//    for (int j = 0; j < sapmling_frame; ++j) {
-//      sum += range_diff_[distribution(generator)];
-//    }
-//    sum /= sapmling_frame;
-//    sums.push_back(sum);
-//  }
-//  std::sort(sums.begin(), sums.end());
-//  int begin = sums.size() * alpha / 2;
-//  int end = sums.size() * (1.0 - alpha / 2);
-//  double sum = 0;
-//  for (int i = begin; i < end; ++i) {
-//    sum += sums[i];
-//  }
-//  sum /= (sums.size() * (1.0 - alpha));
-//  return sum;
-//}
-// std::vector<double> ImageProcessor::Metrics() {
-//  std::vector<double> metrics;
-//  SetDiffToRatio();
-//  metrics.push_back(MinMaxMetric());
-//  metrics.push_back(AvgMetric(7, 100, 0.1));
-//  SetDiffToSubstr();
-//  metrics.push_back(MinMaxMetric());
-//  metrics.push_back(AvgMetric(7, 100, 0.1));
-//
-//  metrics.push_back(CenterMetric());
-//  return metrics;
-//}
-// std::string ImageProcessor::Name() { return name_; }
-//
-// std::vector<double> ImageProcessor::CenterLine() {
-//  std::vector<double> output(4);  // vx, vy, x0, y0
-//  std::vector<cv::Point2d> input;
-//  for (int i = 0; i < central_points_.size(); ++i) {
-//    input.push_back(coordinates_[central_points_[i]]);
-//  }
-//  cv::fitLine(input, output, cv::DIST_L2, 0, 0.01, 0.01);
-//  return output;
-//}
-// double ImageProcessor::CenterMetric() {
-//  std::vector<double> line(CenterLine());
-//  MakeVectorUnit(line);
-//  cv::Point2d unit_vec(line[0], line[1]), reference_vec(0, 1);
-//  // std::cout<<line[0]<<' '<<line[1]<<'\n';
-//  // DrawCenter(line);
-//  return Range(unit_vec, reference_vec);
-//}
-// void ImageProcessor::MakeVectorUnit(std::vector<double>& line) {
-//  line[0] = abs(line[0]);
-//  line[1] = abs(line[1]);
-//  line[0] /= line[1];
-//  line[1] = 1;
-//}
-// void ImageProcessor::DrawCenter(std::vector<double>& line) {
-//  int t(1000);
-//  cv::Point2d p1(line[2], line[3]), p2;
-//  p2.x = p1.x + line[0] * t;
-//  p2.y = p1.y + line[1] * t;
-//  p1.x -= line[0] * t;
-//  p1.y -= line[1] * t;
-//  const cv::Scalar blue(255, 0, 0);
-//  cv::line(img_, p1, p2, blue);
-//}
-//
-// ImageProcessor::ImageProcessor(std::ifstream& points_symmetry,
-//                               std::string classifier)
-//    : ImageProcessor(points_symmetry) {
-//  if (!face_detector_.load(classifier)) {
-//    std::cout << "not loaded classifier\n";
-//  }
-//}
-// void ImageProcessor::FindFace(std::vector<cv::Rect>& output) {
-//  double scale(0.25);
-//  double face_size(0.2);
-//  cv::Mat grayscale;
-//  cv::cvtColor(img_, grayscale, cv::COLOR_BGR2GRAY);
-//  cv::resize(grayscale, grayscale, cv::Size(), scale, scale);
-//  cv::imshow("gray", grayscale);
-//  face_detector_.detectMultiScale(
-//      grayscale, output, 1.1, 3, 0,
-//      cv::Size(grayscale.cols * face_size, grayscale.rows * face_size));
-//  for (int i = 0; i < output.size(); ++i) {
-//    output[i].x /= scale;
-//    output[i].y /= scale;
-//    output[i].height /= scale;
-//    output[i].width /= scale;
-//  }
-//}
-// void ImageProcessor::OutlineFace() {
-//  std::vector<cv::Rect> faces;
-//  FindFace(faces);
-//  for (auto face : faces) {
-//    cv::Scalar red(0, 0, 255);
-//    cv::rectangle(img_, face, red);
-//  }
-//}
-// void RotateImage(cv::Mat& img, double angle) {
-//  cv::Point center(img.cols / 2, img.rows / 2);
-//  cv::Mat rot_mat(cv::getRotationMatrix2D(center, angle, 1));
-//  cv::warpAffine(img, img, rot_mat, img.size());
-//}
-// void ImageProcessor::Rotation() {
-//  cv::Mat orig = img_.clone();
-//  for (int i = 0; i < 90; ++i) {
-//    img_ = orig.clone();
-//    cv::imshow("fresh", orig);
-//    RotateImage(img_, i);
-//    OutlineFace();
-//    DisplayImage();
-//  }
-//}
 template <typename _Tp>
 void OLBP(const cv::Mat& src, cv::Mat& dst) {
   dst = cv::Mat::zeros(src.rows - 2, src.cols - 2, CV_8UC1);
@@ -462,19 +231,9 @@ bool ObtainData(std::string right_path, std::string wrong_path,
                 std::string output_path, int min_zone_size) {
   using namespace std;
   using namespace cv;
-  // CascadeClassifier face_detector;
-  // face_detector.load("../../resources/haarcascade_frontalface_default.xml");
-  // CascadeClassifier eye_detector_l;
-  // eye_detector_l.load("../../resources/haarcascade_lefteye_2splits.xml");
-  // CascadeClassifier eye_detector_r;
-  // eye_detector_r.load("../../resources/haarcascade_righteye_2splits.xml");
   cv::FileStorage output(output_path, cv::FileStorage::WRITE);
   output << "samples"
          << "[";
-  // AddDataFromUncut(right_path, true, output, face_detector, eye_detector_l,
-  //                 eye_detector_r, n_zones);
-  // AddDataFromUncut(wrong_path, false, output, face_detector, eye_detector_l,
-  //                 eye_detector_r, n_zones);
   AddDataFromCut(right_path, true, output, min_zone_size);
   AddDataFromCut(wrong_path, false, output, min_zone_size);
   output << "]";
@@ -961,71 +720,12 @@ double GiniImpurity(std::tuple<int, int, int, int> occurances) {
   return GiniImpurity(p1, p2) * w1 + GiniImpurity(p3, p4) * w2;
 }
 
-void DistortImages(std::vector<Sample>& image_list, std::string images_path,
-                   std::string output_right_path,
-                   std::string output_wrong_path) {
-  for (auto sample : image_list) {
-    cv::Mat im = imread(images_path + '/' + sample.name_, cv::IMREAD_COLOR);
-    BrightnessDistortImage(im);
-    std::string output_path;
-    if (sample.is_right_) {
-      output_path = output_right_path;
-    } else {
-      output_path = output_wrong_path;
-    }
-    imwrite(output_path + '/' + sample.name_, im);
-  }
-}
-
-void BrightnessDistortImage(cv::Mat& image) {
-  double b_k = 0.6;
-  double g_k = 1;
-  double r_k = 0.8;
-  for (int y = 0; y < image.rows; ++y) {
-    for (int x = 0; x < image.cols; ++x) {
-      image.at<cv::Vec3b>(y, x)[0] *= b_k;
-      image.at<cv::Vec3b>(y, x)[1] *= g_k;
-      image.at<cv::Vec3b>(y, x)[2] *= r_k;
-    }
-  }
-}
 }  // namespace face_assessment
 
 using namespace face_assessment;
 using namespace std;
 using namespace cv;
 int main() {
-  // std::vector<std::string> paths;
-  // for (auto x :
-  //     std::filesystem::directory_iterator("../../resources/dataset/cut")) {
-  //  if (x.is_directory()) {
-  //    paths.push_back(x.path().string());
-  //  }
-  //}
-  ////// for (int i = 0; i < paths.size(); ++i) {
-  //////  std::filesystem::create_directory(paths[i] + "_cut");
-  //////}
-  ////// CutImages(paths);
-
-  // int n(0);
-  // for (auto path : paths) {
-  //  std::vector<std::string> imgs;
-  //  for (auto x : std::filesystem::directory_iterator(path)) {
-  //    if (!x.is_directory()) {
-  //      imgs.push_back(x.path().string());
-  //    }
-  //  }
-  //  int n_zero(4);
-  //  for (int i = 0; i < imgs.size(); ++i) {
-  //    ++n;
-  //    std::string name(to_string(n));
-  //    name =
-  //        path + "/" + std::string(n_zero - name.length(), '0') + name +
-  //        ".png";
-  //    std::cout << imgs[i] << '\n' << name << '\n';
-  //    rename(imgs[i].c_str(), name.c_str());
-  //  }
-  //}
 
   std::string right("../../resources/dataset/cut/right_4_cut");
   std::string wrong("../../resources/dataset/cut/wrong_3_cut");
@@ -1040,11 +740,11 @@ int main() {
   std::string distorted_data_path("../../resources/data_distorted.yaml");
   int min_zone(2);
 
-  //// ObtainData(right, wrong, data, min_zone);
-  //// cout << "obtained" << '\n';
+   ObtainData(right, wrong, data, min_zone);
+   cout << "obtained" << '\n';
 
-  //// TeachAdaBoost(data, adaboost_path, unused_path, 0.75, 100);
-  //// std::cout << "tought\n";
+   TeachAdaBoost(data, adaboost_path, unused_path, 0.75, 100);
+   std::cout << "tought\n";
 
   std::vector<Sample> unused;
   ReadSamples(unused_path, unused);
@@ -1053,12 +753,6 @@ int main() {
   std::cout << "read\n";
   AssignByAdaBoost(unused, stumps);
 
-  DistortImages(unused, all_path, distorted_right_path, distorted_wrong_path);
-  ObtainData(distorted_right_path, distorted_wrong_path, distorted_data_path,
-             min_zone);
-  std::vector<Sample> distorted;
-  ReadSamples(distorted_data_path,distorted);
-  AssignByAdaBoost(distorted,stumps);
 
   return 0;
 }

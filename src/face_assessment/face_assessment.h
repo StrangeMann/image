@@ -153,10 +153,11 @@ void ReadSamples(std::string data_path, std::vector<Sample>& output);
 void ReadStumps(std::string data_path, std::vector<Stump>& output);
 void AssignByAdaBoost(std::vector<Sample>& data, std::vector<Stump>& stumps);
 
-void DistortImages(std::vector<Sample>& image_list, std::string images_path,
+void BGRDistortImages(std::vector<Sample>& image_list, std::string images_path,
                    std::string output_right_path,
-                   std::string output_wrong_path);
-void BrightnessDistortImage(cv::Mat& image);
+                   std::string output_wrong_path,double b_k,double g_k,double r_k);
+void BGRDistortImage(cv::Mat& image,double b_k,double g_k,double r_k);
+void ClusterColors(std::vector<std::string>& image_paths,std::string output_path,int K);
 }  // namespace face_assessment
 
 #endif
